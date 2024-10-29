@@ -34,7 +34,7 @@ def get_implant_result(uname_retr: str, pw_retr: str) -> str:
         secure_client_socket.close()
         return response
     except Exception as e:
-        return e
+        return f"error: {e}"
 
 
 def send_command(implant_id_pub: str, uname_send: str, pw_send: str, command_pub: str) -> str:
@@ -70,7 +70,7 @@ def send_command(implant_id_pub: str, uname_send: str, pw_send: str, command_pub
         print(f"Server response: {response}")
         secure_client_socket.close()
     except Exception as e:
-        return e
+        return f"error: {e}"
 
 
 if __name__ == "__main__":

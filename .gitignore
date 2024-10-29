@@ -1,0 +1,6 @@
+/__pycache__
+/.idea
+pubsub.log
+*.log
+*.pkl
+*.pem

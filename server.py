@@ -22,6 +22,12 @@ implant_command_queues = {
 # Result storage for each user
 # Keeping this as a nested dict for now
 result_storage = {
+    """
+    This is a nested dict for now
+    The intention is that a user will interact with multiple implants
+    Then to get the results from individual implants, they search for the implant key
+    The value they get is the first element which can then be popped to move others up
+    """
     "tester": [],
     "matt_tester": [],
 }

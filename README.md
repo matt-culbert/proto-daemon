@@ -16,3 +16,9 @@ Invoke-WebRequest -Uri http://127.0.0.1:5000/1234 -Method POST -Body $jsonPost -
 ```bash
 xxd -i config.txt > config_data.h
 ```
+
+### Linking external CPP project files locally
+Makes a hard link from the CPP project directory to the local directory holding the main Python project
+```bash
+mklink /H <link> <target>
+```

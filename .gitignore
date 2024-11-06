@@ -4,3 +4,4 @@ pubsub.log
 *.log
 *.pkl
 *.pem
+node_modules/.mf/cf.json

@@ -1,3 +1,5 @@
+import gc
+
 import bcrypt
 import pickle
 import getpass
@@ -21,10 +23,22 @@ def compare_hash(operator: str, pw_to_compare: str) -> bool:
         # Use bcrypt's built in method to check the password
         pw_comp_result = bcrypt.checkpw(bytes(pw_to_compare, 'utf-8'), data[operator])
         if pw_comp_result is True:
+            # Delete the sensitive data
+            del pw_to_compare, data, operator, pw_comp_result
+            # Garbage collect
+            gc.collect()
             return True
         else:
+            # Delete the sensitive data
+            del pw_to_compare, data, operator, pw_comp_result
+            # Garbage collect
+            gc.collect()
             return False
     else:
+        # Delete the sensitive data
+        del pw_to_compare, data, operator
+        # Garbage collect
+        gc.collect()
         return False
 
 
@@ -54,6 +68,10 @@ def save_password(inpt_uname: str, inpt_pw) -> bool:
         with open('users.pkl', 'wb') as file:
             # Dump the data into a local dict
             pickle.dump(data, file)
+            # Delete the sensitive data
+            del inpt_pw, hashedpw, data
+            # Garbage collect
+            gc.collect()
             return True
 
     # Check the operator name doesn't exist
@@ -65,9 +83,17 @@ def save_password(inpt_uname: str, inpt_pw) -> bool:
         with open('users.pkl', 'wb') as file:
             # Write the data to the file
             pickle.dump(data, file)
+            # Delete the sensitive data
+            del inpt_pw, hashedpw, data
+            # Garbage collect
+            gc.collect()
             return True
 
     else:
+        # Delete the sensitive data
+        del inpt_pw, data
+        # Garbage collect
+        gc.collect()
         return False
 
 

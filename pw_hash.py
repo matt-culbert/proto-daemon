@@ -1,18 +1,18 @@
+import gc
+
 import bcrypt
 import pickle
 import getpass
 
 
-def compare_hash(operator: str, pw: str) -> bool:
+# Playing with type hinting in these functions
+def compare_hash(operator: str, pw_to_compare: str) -> bool:
     """
     Compares a password and a hash
-
-    Parameters:
-        pw (str): The password being compared
-        operator (str): The operator to find the PW for
-
-    Returns:
-        bool: Returns true or false based on the comparison outcome
+    Pulls them from a pkl file stored locally
+    :param operator: The username to get the associated hash
+    :param pw_to_compare: The password being compared
+    :return: Bool indicating pass or fail
     """
     with open('users.pkl', 'rb') as file:
         # Dump the data into a local dict
@@ -21,25 +21,33 @@ def compare_hash(operator: str, pw: str) -> bool:
     # Search the dict with the operator ID as the search key
     if data[operator] and operator in data:
         # Use bcrypt's built in method to check the password
-        result = bcrypt.checkpw(bytes(pw, 'utf-8'), data[operator])
-        if result is True:
+        pw_comp_result = bcrypt.checkpw(bytes(pw_to_compare, 'utf-8'), data[operator])
+        if pw_comp_result is True:
+            # Delete the sensitive data
+            del pw_to_compare, data, operator, pw_comp_result
+            # Garbage collect
+            gc.collect()
             return True
         else:
+            # Delete the sensitive data
+            del pw_to_compare, data, operator, pw_comp_result
+            # Garbage collect
+            gc.collect()
             return False
     else:
+        # Delete the sensitive data
+        del pw_to_compare, data, operator
+        # Garbage collect
+        gc.collect()
         return False
 
 
 def save_password(inpt_uname: str, inpt_pw) -> bool:
     """
-    Adds a password to the store
-
-    Parameters:
-        inpt_uname (str): The operator name associated with the password
-        inpt_pw (str): The password associated with the name
-
-    Returns:
-        bool: Bool indicating success or failure when storing the uname/pw
+    Add a user password to the store
+    :param inpt_uname: The username to associate with the password
+    :param inpt_pw: The users' password
+    :return: Bool indicating pass or fail
     """
     # Empty dict
     data = {}
@@ -57,13 +65,14 @@ def save_password(inpt_uname: str, inpt_pw) -> bool:
         data[inpt_uname] = hashedpw
 
         # Save the new data
-        try:
-            with open('users.pkl', 'wb') as file:
-                # Dump the data into a local dict
-                pickle.dump(data, file)
-                return True
-        except Exception as e:
-            return e
+        with open('users.pkl', 'wb') as file:
+            # Dump the data into a local dict
+            pickle.dump(data, file)
+            # Delete the sensitive data
+            del inpt_pw, hashedpw, data
+            # Garbage collect
+            gc.collect()
+            return True
 
     # Check the operator name doesn't exist
     if inpt_uname not in data:
@@ -71,16 +80,21 @@ def save_password(inpt_uname: str, inpt_pw) -> bool:
         hashedpw = bcrypt.hashpw(bytes(inpt_pw, 'utf-8'), salt)
         data[inpt_uname] = hashedpw
 
-        # Save the new data
-        try:
-            with open('users.pkl', 'wb') as file:
-                # Dump the data into a local dict
-                pickle.dump(data, file)
-                return True
-        except Exception as e:
-            return e
+        with open('users.pkl', 'wb') as file:
+            # Write the data to the file
+            pickle.dump(data, file)
+            # Delete the sensitive data
+            del inpt_pw, hashedpw, data
+            # Garbage collect
+            gc.collect()
+            return True
+
     else:
-        return "Name exists, choose a different one"
+        # Delete the sensitive data
+        del inpt_pw, data
+        # Garbage collect
+        gc.collect()
+        return False
 
 
 if __name__ == "__main__":
@@ -90,4 +104,4 @@ if __name__ == "__main__":
     if result is True:
         print("Registered user")
     else:
-        print(result)
+        print("Name exists, choose a different one")

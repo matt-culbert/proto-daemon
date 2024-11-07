@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"strings"
+	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
 )
@@ -139,11 +143,25 @@ func CreateAAAARequest(transactionID uint16) ([]byte, error) {
 	var msg dnsmessage.Message
 	msg.Header.ID = transactionID
 	msg.Header.RecursionDesired = true
+
+	// Add the question section
 	msg.Questions = []dnsmessage.Question{
 		{
-			Name:  dnsmessage.MustNewName("example.com."),
+			Name:  dnsmessage.MustNewName("matt.culbert."),
 			Type:  dnsmessage.TypeAAAA,
 			Class: dnsmessage.ClassINET,
+		},
+	}
+
+	// Add EDNS0 for larger UDP payloads
+	msg.Additionals = []dnsmessage.Resource{
+		{
+			Header: dnsmessage.ResourceHeader{
+				Name:  dnsmessage.MustNewName("."),
+				Type:  dnsmessage.TypeOPT,
+				Class: 4096, // Request 4096-byte payload size
+			},
+			Body: &dnsmessage.OPTResource{},
 		},
 	}
 
@@ -154,6 +172,41 @@ func CreateAAAARequest(transactionID uint16) ([]byte, error) {
 	}
 
 	return packet, nil
+}
+
+func PerformDoHRequest(dohURL string, query []byte) ([]byte, error) {
+	// Create an HTTP client with a timeout
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+
+	// Prepare the HTTP request
+	req, err := http.NewRequest("POST", dohURL, bytes.NewBuffer(query))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/dns-message")
+
+	// Perform the HTTP request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send DoH request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check if the response status is OK
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("DoH server returned non-OK status: %s", resp.Status)
+	}
+
+	// Read the response body into a byte slice
+	responseData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read DoH response body: %v", err)
+	}
+	//asString := string(responseData)
+	fmt.Println("DoH Response:", responseData)
+	return responseData, nil
 }
 
 func main() {
@@ -195,75 +248,35 @@ func main() {
 
 	fmt.Printf("Constructed PTR Request Packet: %x\n", packet)
 
-	// Send the DNS packet over UDP
-	conn, err := net.Dial("udp", configData.DNSServer) // Using the DNS server from config
+	transactionID := uint16(1234)
+	aaaaQuery, err := CreateAAAARequest(transactionID)
 	if err != nil {
-		log.Fatalf("Failed to connect to DNS server: %v", err)
-	}
-	defer conn.Close()
-
-	// Send the packet
-	_, err = conn.Write(packet)
-	if err != nil {
-		log.Fatalf("Failed to send DNS packet: %v", err)
+		log.Fatalf("Failed to create AAAA request: %v", err)
 	}
 
-	// Receive the response
-	buffer := make([]byte, 512)
-	n, err := conn.Read(buffer)
+	dohUrl := "http://" + configData.DNSServer
+
+	// Perform the DoH request
+	responseData, err := PerformDoHRequest(dohUrl, aaaaQuery)
 	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
+		log.Fatalf("Failed to perform DoH request: %v", err)
 	}
 
+	// This will error right now since the data we get back is not a real IPv6 address
 	// Unpack and parse the DNS response
+	// Currently this only works on the first request to the server
+	// 2nd request will fail until the server.py is restarted
 	var response dnsmessage.Message
-	err = response.Unpack(buffer[:n])
+	fmt.Printf("Raw DNS Response (Hex): %x\n", responseData)
+	err = response.Unpack(responseData)
 	if err != nil {
 		log.Fatalf("Failed to unpack DNS response: %v", err)
 	}
 
-	// Print the PTR record from the response
+	// Print the AAAA records from the response
 	for _, answer := range response.Answers {
-		if answer.Header.Type == dnsmessage.TypePTR {
-			fmt.Printf("PTR Record: %s\n", answer.Body.(*dnsmessage.PTRResource).PTR.String())
-		}
-	}
-
-	aaaaQuery, err := CreateAAAARequest(12345)
-	if err != nil {
-		log.Fatalf("Failed to create PTR request: %v", err)
-	}
-
-	conn2, err := net.Dial("udp", configData.DNSServer) // Using the DNS server from config
-	if err != nil {
-		log.Fatalf("Failed to connect to DNS server: %v", err)
-	}
-	defer conn.Close()
-
-	// Send the packet
-	_, err = conn2.Write(aaaaQuery)
-	if err != nil {
-		log.Fatalf("Failed to send DNS packet: %v", err)
-	}
-
-	// Receive the response
-	buffer2 := make([]byte, 512)
-	n2, err := conn2.Read(buffer2)
-	if err != nil {
-		log.Fatalf("Failed to read response: %v", err)
-	}
-
-	// Unpack and parse the DNS response
-	var response2 dnsmessage.Message
-	err = response2.Unpack(buffer[:n2])
-	if err != nil {
-		log.Fatalf("Failed to unpack DNS response: %v", err)
-	}
-
-	// Print the AAAA query from the response
-	for _, answer2 := range response2.Answers {
-		if answer2.Header.Type == dnsmessage.TypeAAAA {
-			fmt.Printf("AAAA Record: %v\n", answer2.Body.(*dnsmessage.AAAAResource).AAAA)
+		if answer.Header.Type == dnsmessage.TypeAAAA {
+			fmt.Printf("AAAA Record: %v\n", answer.Body.(*dnsmessage.AAAAResource).AAAA)
 		}
 	}
 }

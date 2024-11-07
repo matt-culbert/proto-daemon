@@ -5,3 +5,4 @@ pubsub.log
 *.pkl
 *.pem
 node_modules/.mf/cf.json
+implant/implant.exe

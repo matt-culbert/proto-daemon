@@ -11,3 +11,5 @@ implant/config.json
 *.map
 .wrangler/tmp/bundle-KY8Inb/middleware-insertion-facade.js
 .wrangler/tmp/bundle-KY8Inb/checked-fetch.js
+*.exe
+/.wrangler

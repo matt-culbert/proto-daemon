@@ -113,7 +113,9 @@ if __name__ == "__main__":
     # Garbage collect
     gc.collect()
     while True:
-        choice = input("1: Interact or 2: Retrieve results > ")
+        choice = input("1: Interact or\n"
+                       "2: Retrieve results or\n"
+                       "3: Build an implant > ")
         match choice:
             case "1":
                 implant_id = input("Enter implant ID: ")
@@ -122,5 +124,14 @@ if __name__ == "__main__":
             case "2":
                 result = get_implant_result(uname, session_token)
                 print(result)
+            case "3":
+                build_choice = input("HTTP or DNS > ")
+                match build_choice.lower():
+                    case "http":
+                        print("Building for HTTP")
+                    case "dns":
+                        print("Building for DNS")
+                    case _:
+                        print("Enter either DNS or HTTP")
             case _:
                 print("Enter either 1 or 2 \n")

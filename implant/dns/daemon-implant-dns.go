@@ -1,3 +1,5 @@
+//go:build dns
+
 package main
 
 import (

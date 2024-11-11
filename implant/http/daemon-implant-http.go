@@ -26,9 +26,9 @@ var configData []byte // Embedded config data
 
 // Config struct to hold configuration
 type Config struct {
-	listener string `json:"listener"`
-	id       string `json:"id"`
-	sleep    string `json:"sleep"`
+	Listener string `json:"listener"`
+	Id       string `json:"id"`
+	Sleep    string `json:"sleep"`
 }
 
 // Function to load configuration from embedded JSON
@@ -42,7 +42,7 @@ func loadConfig() (Config, error) {
 
 func main() {
 	// Load configuration from embedded data
-	_, err := loadConfig()
+	conf, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -69,7 +69,7 @@ func main() {
 	// Compute the SHA-256 hash
 	localHash := hasher.Sum(nil)
 
-	url := "http://localhost:5000/1234"
+	url := "http://" + conf.Listener + "/" + conf.Id
 
 	// Make the GET request
 	resp, err := http.Get(url)

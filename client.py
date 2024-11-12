@@ -34,6 +34,37 @@ def authenticate_user(uname_retr: str, pw_retr: str) -> str:
         print(f"error: {e}")
 
 
+def build_implant(uname_retr: str, pw_send: str, proto: str) -> str:
+    """
+    Authenticate a user and begin a session
+    :param uname_retr: The username
+    :param pw_send: The associated session token
+    :param proto: The protocol to build the implant for
+    :return: A session token to use
+    """
+    # Create the socket
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    client_context.minimum_version = ssl.TLSVersion.TLSv1_3
+    client_context.maximum_version = ssl.TLSVersion.TLSv1_3
+    client_context.check_hostname = False
+    client_context.verify_mode = ssl.CERT_NONE
+    # Wrap it in SSL
+    secure_client_socket = client_context.wrap_socket(
+        client
+    )
+    # Connect
+    try:
+        secure_client_socket.connect(('localhost', 9999))
+        build_request = f"BLD {uname_retr} {pw_send} {proto}"
+        secure_client_socket.send(build_request.encode())
+        response = secure_client_socket.recv(4096).decode()
+        secure_client_socket.close()
+        return response
+    except Exception as e:
+        print(f"error: {e}")
+
+
 def get_implant_result(uname_retr: str, pw_retr: str) -> str:
     """
     Get the stored results of commands run
@@ -59,7 +90,7 @@ def get_implant_result(uname_retr: str, pw_retr: str) -> str:
     # Connect
     try:
         secure_client_socket.connect(('localhost', 9999))
-        subscribe_request = f"SUB {uname_retr} {pw_retr}"
+        subscribe_request = f"RTR {uname_retr} {pw_retr}"
         secure_client_socket.send(subscribe_request.encode())
         response = secure_client_socket.recv(4096).decode()
         secure_client_socket.close()
@@ -129,6 +160,7 @@ if __name__ == "__main__":
                 match build_choice.lower():
                     case "http":
                         print("Building for HTTP")
+                        build_implant(uname, session_token, "http")
                     case "dns":
                         print("Building for DNS")
                     case _:

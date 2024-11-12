@@ -1,3 +1,7 @@
+"""
+POC client to demonstrate an authenticated request for the latest commands
+Generates an HMAC using a PSK that the server knows
+"""
 import requests
 import hmac
 import hashlib
@@ -14,6 +18,7 @@ def generate_auth_token(client_uri):
     message = f"{client_uri}:{client_timestamp}"
     hmac_obj = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256)
     client_token = hmac_obj.hexdigest()
+    print(f"token: {client_token}")
 
     return client_token, client_timestamp
 

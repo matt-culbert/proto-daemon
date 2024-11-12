@@ -3,7 +3,6 @@
 package main
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -20,6 +19,8 @@ type ResponseData struct {
 	Key     string `json:"key"`
 }
 
+var CompUUID string
+
 func main() {
 	// Load configuration from embedded data
 	conf, err := shared.LoadConfig()
@@ -27,9 +28,9 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	baseUrl := "http://" + conf.Listener + "/auth/" + conf.Id
+	baseUrl := "http://" + conf.Listener + "/auth/" + CompUUID
 
-	token, timestamp := shared.GenerateAuthToken(conf.Id, "4321")
+	token, timestamp := shared.GenerateAuthToken(CompUUID, "4321")
 
 	reqURL, _ := url.Parse(baseUrl)
 
@@ -61,7 +62,7 @@ func main() {
 
 	// Parse the JSON response
 	var data ResponseData
-	_ = json.Unmarshal(body, &data)
+	err = json.Unmarshal(body, &data)
 	if err != nil {
 		log.Fatalf("Failed to parse JSON response: %v", err)
 	}

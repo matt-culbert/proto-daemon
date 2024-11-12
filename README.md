@@ -22,3 +22,7 @@ go build -ldflags "-X main.CompUUID=<ImplantID>" -tags <protocol> ./<dir>
 ```bash
 go build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```
+#### Or using Garble
+```bash
+garble build -ldflags "-X main.CompUUID=5678" -tags http ./http
+```

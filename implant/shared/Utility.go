@@ -24,6 +24,8 @@ type Config struct {
 	Listener string `json:"listener"`
 	Id       string `json:"id"`
 	Sleep    string `json:"sleep"`
+	Psk1     string `json:"psk1"`
+	Psk2     string `json:"psk2"`
 }
 
 // Function to load configuration from embedded JSON

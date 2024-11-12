@@ -30,7 +30,7 @@ func main() {
 
 	baseUrl := "http://" + conf.Listener + "/auth/" + CompUUID
 
-	token, timestamp := shared.GenerateAuthToken(CompUUID, "4321")
+	token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
 
 	reqURL, _ := url.Parse(baseUrl)
 
@@ -75,7 +75,7 @@ func main() {
 	fmt.Println("Decoded string:", decoded)
 
 	// Verify the message with the received HMAC
-	if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte("1234")) {
+	if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
 		fmt.Println("HMAC is valid!")
 	} else {
 		fmt.Println("HMAC is invalid or message was tampered with.")

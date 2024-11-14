@@ -56,13 +56,13 @@ def build_implant(uname_retr: str, pw_send: str, proto: str) -> str:
     # Connect
     try:
         secure_client_socket.connect(('localhost', 9999))
-        build_request = f"BLD {uname_retr} {pw_send} {proto}"
-        secure_client_socket.send(build_request.encode())
+        bld_request = f"BLD {uname_retr} {pw_send} {proto}"
+        secure_client_socket.send(bld_request.encode())
         response = secure_client_socket.recv(4096).decode()
+        print(f"Server response: {response}")
         secure_client_socket.close()
-        return response
     except Exception as e:
-        print(f"error: {e}")
+        return f"error: {e}"
 
 
 def get_implant_result(uname_retr: str, pw_retr: str) -> str:

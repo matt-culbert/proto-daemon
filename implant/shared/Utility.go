@@ -114,6 +114,7 @@ func GetSelfHash() []byte {
 
 func DoLua(LuaStr string) bool {
 	L := lua.NewState()
+	L.OpenLibs()
 	defer L.Close()
 	if err := L.DoString(LuaStr); err != nil {
 		return false

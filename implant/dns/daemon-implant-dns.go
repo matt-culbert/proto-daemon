@@ -14,11 +14,32 @@ import (
 
 // Helper function to format PTR domains
 func formatPTR(ip string) string {
-	parts := strings.Split(ip, ".")
-	for i := 0; i < len(parts)/2; i++ {
-		parts[i], parts[len(parts)-i-1] = parts[len(parts)-i-1], parts[i]
+	// Expand the IPv6 address to its full representation
+	expandedIP := expandIPv6(ip)
+
+	// Remove colons and reverse the characters
+	reversed := []rune{}
+	for _, char := range expandedIP {
+		if char != ':' {
+			reversed = append([]rune{char}, reversed...)
+		}
 	}
-	return fmt.Sprintf("%s.ip6.arpa", strings.Join(parts, "."))
+
+	// Join the reversed characters with dots and append ".ip6.arpa"
+	return fmt.Sprintf("%s.ip6.arpa", strings.Join(strings.Split(string(reversed), ""), "."))
+}
+
+func expandIPv6(ip string) string {
+	// Expands an IPv6 address to its full form
+	parts := strings.Split(ip, ":")
+	var fullParts []string
+	for _, part := range parts {
+		// Expand each part to 4 digits
+		fullParts = append(fullParts, fmt.Sprintf("%04s", part))
+	}
+
+	// Join expanded parts
+	return strings.Join(fullParts, ":")
 }
 
 func main() {

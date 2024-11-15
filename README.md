@@ -2,6 +2,7 @@
 ```shell
 openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
 ```
+
 ### Powershell commands for simulating implant
 ```powershell
 $postParams = @{"msg" = "7465:7374::"}
@@ -12,13 +13,21 @@ Invoke-WebRequest -Uri http://127.0.0.1:5000/1234 -Method GET
 Invoke-WebRequest -Uri http://127.0.0.1:5000/1234 -Method POST -Body $jsonPost -Headers $headers
 ```
 
-### Header generation
+### Compiling Go exe
+#### Syntax
 ```bash
-xxd -i config.txt > config_data.h
+go build -ldflags "-X main.CompUUID=<ImplantID>" -tags <protocol> ./<dir>
+```
+#### Example
+```bash
+go build -ldflags "-X main.CompUUID=5678" -tags http ./http
+```
+#### Or using Garble
+```bash
+garble build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```
 
-### Linking external CPP project files locally
-Makes a hard link from the CPP project directory to the local directory holding the main Python project
+### Run the CF worker
 ```bash
-mklink /H <link> <target>
+npx wrangler dev .\cf-worker.js
 ```

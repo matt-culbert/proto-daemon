@@ -95,33 +95,23 @@ function createAnswerDnsResponse(domain, transaction_id, ipv6List) {
   const flags = new Uint8Array([flags1, flags2]);
 
   const qdcount = new Uint8Array([0x00, 0x01]); // 1 question
-  const ancount = new Uint8Array([0x00, 0x01]); // 1 answer
+  const ancount = new Uint8Array([0x00, ipv6List.length]); // Number of answers
   const nscount = new Uint8Array([0x00, 0x00]); // No authority records
   const arcount = new Uint8Array([0x00, 0x00]); // No additional records
 
-  // Encode the domain name in DNS label format for the question section
   const encodedDomain = encodeDomainName(domain);
 
-  // Build the question section
   const question = new Uint8Array([
     ...encodedDomain,      // Encoded domain name
     0x00, 0x1C,            // Type AAAA (IPv6)
     0x00, 0x01             // Class IN (0x0001)
   ]);
 
-  // Build the answer section
   const answers = ipv6List.map(ipv6 => {
-    // Convert each IPv6 address to a 16-byte format
-    const ipv6Bytes = ipv6.split(':')
-      .flatMap(part => {
-        const segment = parseInt(part || '0', 16);
-        return [(segment >> 8) & 0xff, segment & 0xff];
-      });
-    while (ipv6Bytes.length < 16) ipv6Bytes.push(0x00); // Pad to 16 bytes
-
+    const ipv6Bytes = parseIPv6(ipv6);
     const rdLength = new Uint8Array([0x00, 0x10]); // Length of IPv6 address
 
-    const answer = new Uint8Array([
+    return new Uint8Array([
       ...encodedDomain,   // Domain name in label format
       0x00, 0x1C,         // Type AAAA
       0x00, 0x01,         // Class IN
@@ -129,26 +119,40 @@ function createAnswerDnsResponse(domain, transaction_id, ipv6List) {
       ...rdLength,        // Length of data (16 bytes for IPv6)
       ...ipv6Bytes        // IPv6 address bytes
     ]);
-
-    return answer;
   });
 
-  // Construct the DNS response message by placing the question and answer sections separately
-  const response = new Uint8Array([
-    ...transaction_id, // Transaction ID
-    ...flags,          // Flags
-    ...qdcount,        // Question count
-    ...ancount,        // Answer count
-    ...nscount,        // Authority count
-    ...arcount,        // Additional record count
-    ...question,       // Question section
-    ...answers.flat()  // Flattened answer section
-  ]);
+  const flattenedAnswers = answers.reduce(
+    (acc, answer) => acc.concat(Array.from(answer)),
+    []
+  );
 
+  const response = new Uint8Array(
+    transaction_id.length +
+    flags.length +
+    qdcount.length +
+    ancount.length +
+    nscount.length +
+    arcount.length +
+    question.length +
+    flattenedAnswers.length
+  );
+
+  let offset = 0;
+  response.set(transaction_id, offset); offset += transaction_id.length;
+  response.set(flags, offset); offset += flags.length;
+  response.set(qdcount, offset); offset += qdcount.length;
+  response.set(ancount, offset); offset += ancount.length;
+  response.set(nscount, offset); offset += nscount.length;
+  response.set(arcount, offset); offset += arcount.length;
+  response.set(question, offset); offset += question.length;
+  response.set(flattenedAnswers, offset);
+
+  console.log("Response Length:", response.length);
   return new Response(response.buffer, {
     headers: { 'Content-Type': 'application/dns-message' }
   });
 }
+
 
 // Helper function to expand and convert IPv6 address to 16-byte array
 function expandAndConvertIPv6(ipv6) {
@@ -261,4 +265,26 @@ function encodeDomainName(domain) {
   labels.push(0x00);  // End the domain name with a null byte
   
   return labels;
+}
+
+function parseIPv6(ipv6) {
+  const segments = ipv6.split(':');
+  const expandedSegments = [];
+
+  let hasEmptySegment = false;
+  for (const segment of segments) {
+    if (segment === '') {
+      if (!hasEmptySegment) {
+        hasEmptySegment = true;
+        expandedSegments.push(...Array(8 - segments.filter(s => s !== '').length).fill('0'));
+      }
+    } else {
+      expandedSegments.push(segment.padStart(4, '0'));
+    }
+  }
+
+  return expandedSegments.flatMap(part => {
+    const segment = parseInt(part, 16);
+    return [(segment >> 8) & 0xff, segment & 0xff];
+  });
 }

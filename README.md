@@ -26,3 +26,8 @@ go build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```bash
 garble build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```
+
+### Run the CF worker
+```bash
+npx wrangler dev .\cf-worker.js
+```

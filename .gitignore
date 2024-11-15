@@ -13,3 +13,5 @@ implant/config.json
 .wrangler/tmp/bundle-KY8Inb/checked-fetch.js
 *.exe
 /.wrangler
+/implant/.wrangler
+/implant/node_modules

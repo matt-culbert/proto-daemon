@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/matt-culbert/dns-daemon/implant/shared"
+	"github.com/matt-culbert/dns-daemon/Implant/shared"
 )
 
 // Struct to hold the response format from the server

@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/matt-culbert/dns-daemon/implant/shared"
+	"github.com/matt-culbert/dns-daemon/Implant/shared"
 )
 
 // Helper function to format PTR domains

@@ -1,4 +1,4 @@
-module github.com/matt-culbert/dns-daemon/implant
+module github.com/matt-culbert/dns-daemon/Implant
 
 go 1.23.0
 

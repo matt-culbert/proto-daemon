@@ -1,7 +1,15 @@
-### Use
+### First use
+Install required modules
+```bash
+pip3 install requirements.txt
+```
 Generate a user by running the pw_hash.py script
 ```bash
 python pw_hash.py
+```
+Generate the SSL cert for the server to secure connections with
+```bash
+openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
 ```
 Start the server
 ```bash
@@ -10,11 +18,6 @@ python server.py
 Start the client and enter the username/password you generated
 ```bash
 python client.py
-```
-
-### Generate cert
-```shell
-openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
 ```
 
 ### Powershell commands for simulating implant

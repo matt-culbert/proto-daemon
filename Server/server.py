@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import os
+import random
 import socket
 import ssl
 import subprocess
@@ -82,12 +83,13 @@ def build_implant(protocol):
     :param protocol: The protocol to communicate over
     :return: bool depending on build success
     """
+    rand_num = random.randint(1000, 9999)
     logger.info("building implant")
     match protocol:
         case "http":
             try:
                 result = subprocess.run(
-                    ["go", "build", "-tags", "http", "./http"],
+                    ["go", "build", "-ldflags", f"-X main.CompUUID={rand_num}", "-tags", "http", "./http"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,
@@ -115,11 +117,12 @@ def garble_implant(protocol):
     :return: bool depending on build success
     """
     logger.info("building implant using garble")
+    rand_num = random.randint(1000, 9999)
     match protocol:
         case "http":
             try:
                 result = subprocess.run(
-                    ["garble", "build", "-tags", "http", "./http"],
+                    ["garble", "build", "-ldflags", f"-X main.CompUUID={rand_num}", "-tags", "http", "./http"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,

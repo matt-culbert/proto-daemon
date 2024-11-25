@@ -88,7 +88,7 @@ def build_implant(protocol):
             try:
                 result = subprocess.run(
                     ["go", "build", "-tags", "http", "./http"],
-                    cwd='../implant',
+                    cwd='../Implant',
                     check=True,
                     capture_output=True,
                     text=True

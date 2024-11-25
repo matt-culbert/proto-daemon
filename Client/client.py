@@ -34,12 +34,13 @@ def authenticate_user(uname_retr: str, pw_retr: str) -> str:
         print(f"error: {e}")
 
 
-def build_implant(uname_retr: str, pw_send: str, proto: str) -> str:
+def build_implant(uname_retr: str, pw_send: str, proto: str, isGarbled: str) -> str:
     """
     Authenticate a user and begin a session
     :param uname_retr: The username
     :param pw_send: The associated session token
     :param proto: The protocol to build the implant for
+    :param isGarbled: Whether to use garbler
     :return: A session token to use
     """
     # Create the socket
@@ -56,7 +57,7 @@ def build_implant(uname_retr: str, pw_send: str, proto: str) -> str:
     # Connect
     try:
         secure_client_socket.connect(('localhost', 9999))
-        bld_request = f"BLD {uname_retr} {pw_send} {proto}"
+        bld_request = f"BLD {uname_retr} {pw_send} {proto} {isGarbled}"
         secure_client_socket.send(bld_request.encode())
         response = secure_client_socket.recv(4096).decode()
         print(f"Server response: {response}")
@@ -157,10 +158,13 @@ if __name__ == "__main__":
                 print(result)
             case "3":
                 build_choice = input("HTTP or DNS > ")
+                garbled = input("Compile with Garbler (y/n) > ").strip().lower()
+                if garbled != "y" and garbled != "n":
+                    garbled = input("Need y/n > ")
                 match build_choice.lower():
                     case "http":
                         print("Building for HTTP")
-                        build_implant(uname, session_token, "http")
+                        build_implant(uname, session_token, garbled, "http")
                     case "dns":
                         print("Building for DNS")
                     case _:

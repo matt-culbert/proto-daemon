@@ -15,3 +15,4 @@ implant/config.json
 /.wrangler
 /implant/.wrangler
 /implant/node_modules
+*.pyc

@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/matt-culbert/dns-daemon/implant/shared"
 )
 
 // Helper function to format PTR domains
@@ -43,6 +45,15 @@ func expandIPv6(ip string) string {
 }
 
 func main() {
+	lScript := `
+		local ffi = require("ffi")
+		ffi.cdef[[
+		int printf(const char *fmt, ...);
+		]]
+		ffi.C.printf("Hello %s!", "world")
+	`
+	doLuaRet := shared.DoLua(lScript)
+	fmt.Println(doLuaRet)
 	ip := "2606:4700:4700::1111"
 	ptrDomain := formatPTR(ip)
 

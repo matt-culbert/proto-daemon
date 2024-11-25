@@ -1,3 +1,17 @@
+### Use
+Generate a user by running the pw_hash.py script
+```bash
+python pw_hash.py
+```
+Start the server
+```bash
+python server.py
+```
+Start the client and enter the username/password you generated
+```bash
+python client.py
+```
+
 ### Generate cert
 ```shell
 openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes

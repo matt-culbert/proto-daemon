@@ -12,8 +12,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	lua "github.com/yuin/gopher-lua"
 )
 
 // Byte array which holds the config file embedded at compile time
@@ -110,15 +108,4 @@ func GetSelfHash() []byte {
 		log.Fatalf("Failed to hash executable file: %v", err)
 	}
 	return hasher.Sum(nil)
-}
-
-func DoLua(LuaStr string) bool {
-	L := lua.NewState()
-	L.OpenLibs()
-	defer L.Close()
-	if err := L.DoString(LuaStr); err != nil {
-		fmt.Println(err.Error())
-		return false
-	}
-	return true
 }

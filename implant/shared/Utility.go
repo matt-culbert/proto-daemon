@@ -46,7 +46,11 @@ func DecodeIPv6ToString(encoded string) (string, error) {
 	hexParts = strings.ReplaceAll(hexParts, `[`, "")
 	hexParts = strings.ReplaceAll(hexParts, `]`, "")
 	hexParts = strings.ReplaceAll(hexParts, `:`, "")
-	result, _ := hex.DecodeString(hexParts)
+	hexParts = strings.ReplaceAll(hexParts, `,`, "")
+	result, err := hex.DecodeString(hexParts)
+	if err != nil {
+		return "", err
+	}
 
 	// Return the decoded string
 	return string(result), nil
@@ -88,6 +92,7 @@ func GenerateAuthToken(uri, psk string) (string, string) {
 	return token, timestamp
 }
 
+// GetSelfHash gets the hash of itself during run time
 func GetSelfHash() []byte {
 	// Get the path of the currently running executable
 	exePath, err := os.Executable()

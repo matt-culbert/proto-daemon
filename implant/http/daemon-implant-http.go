@@ -43,15 +43,6 @@ func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Re
 var CompUUID string
 
 func main() {
-	// testing compression
-	data := "Sensitive data that needs to be obfuscated"
-	compedData, boolRes := shared.DoComp(data)
-	if !boolRes {
-		fmt.Println("compression failed")
-	}
-
-	fmt.Printf("%x", compedData.Bytes())
-
 	// Load configuration from embedded data
 	conf, err := shared.LoadConfig()
 	if err != nil {
@@ -71,10 +62,17 @@ func main() {
 
 		// Add params to the query (The auth token and time)
 		params := url.Values{}
-		params.Add("token", token)
-		params.Add("timestamp", timestamp)
-		//reqURL.RawQuery = params.Encode()
-		//fmt.Println(reqURL.String())
+		hardVals := fmt.Sprintf("timestamp=%s&token=%s", timestamp, token)
+
+		compedData, boolRes := shared.DoComp(hardVals)
+		if boolRes {
+			params.Add(string(compedData.String()), "")
+		} else {
+			params.Add("token", token)
+			params.Add("timestamp", timestamp)
+			//reqURL.RawQuery = params.Encode()
+			//fmt.Println(reqURL.String())
+		}
 
 		resp, err := makeGetRequest(baseUrl, maxRetries, params)
 		if err != nil {

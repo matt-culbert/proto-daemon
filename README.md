@@ -47,7 +47,17 @@ go build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```bash
 garble build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```
-
+#### Compile flag options
+```bash
+-X main.CompUUID - Implant UUID 
+-X main.PostURI - POST URI to use 
+-X main.GetURI - GET URI to use
+```
+#### Compile tag options
+```bash
+withComp - Enable zlib compression
+withLua - Enable support for Lua scripting
+```
 ### Run the CF worker
 ```bash
 npx wrangler dev .\cf-worker.js

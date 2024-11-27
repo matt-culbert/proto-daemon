@@ -49,9 +49,15 @@ garble build -ldflags "-X main.CompUUID=5678" -tags http ./http
 ```
 #### Compile flag options
 ```bash
--X main.CompUUID - Implant UUID 
--X main.PostURI - POST URI to use 
--X main.GetURI - GET URI to use
+# Implant UUID
+# Expects a random but unique 4 digit integer
+-X main.CompUUID 
+# POST URI to use 
+# Possible POST options are `/` or `/un/`
+-X main.PostURI 
+# GET URI to use
+# Possible GET options are `/` or `/auth/` or `/direct/`
+-X main.GetURI
 ```
 #### Compile tag options
 ```bash

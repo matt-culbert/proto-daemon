@@ -41,7 +41,11 @@ Invoke-WebRequest -Uri http://127.0.0.1:5000/1234 -Method POST -Body $jsonPost -
 
 ### Compiling Go exe
 These should be handled by the Makefile, but if you're curious about what's supported or you want to compile the implant manually, this is what's required.
-
+#### Makefile CLI arguments
+The make file takes arguments from the CLI under certain scenarios. When you're not building the default build, you need to pass in the METHOD, which tells make what communication mode to compile for.
+```bash
+make withLua METHOD=withHttp # Example to compile for HTTP comms
+```
 There are tags and ldflags that setup things like the callback URLs, implant ID, and enable supported features.
 #### Compile flag options
 ```bash

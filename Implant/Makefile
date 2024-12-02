@@ -11,7 +11,7 @@ build:
 
 withLua:
 	@echo "Building with random ID: $(RAND_NUM) and with Lua support enabled"
-	go build -ldflags "-X main.CompUUID=$(RAND_NUM) -X main.GetURI=$(GET_ABS_PATH) -X main.PostURI=$(PST_ABS_PATH)" -tags "withHttp withLua" ./daemon
+	go build -ldflags "-X main.CompUUID=$(RAND_NUM) -X main.GetURI=$(GET_ABS_PATH) -X main.PostURI=$(PST_ABS_PATH)" -tags "$(METHOD) withLua" ./daemon
 
 # Clean rule to remove the binary
 clean:

@@ -1,5 +1,5 @@
 import base64
-import binascii
+from urllib.parse import urlparse
 import hashlib
 import hmac
 import json

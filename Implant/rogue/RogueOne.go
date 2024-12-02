@@ -1,0 +1,11 @@
+package main
+
+// Func549687354 important assembly instructions
+func Func549687354() {
+	_ = []byte{
+		0x55,
+		0x48, 0x89, 0xe5,
+		0x48, 0x83, 0xec, 0x10,
+		0xc3,
+	}
+}

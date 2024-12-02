@@ -154,7 +154,7 @@ def build_implant(protocol):
         case "http":
             try:
                 result = subprocess.run(
-                    ["go", "build", "-ldflags", f"-X main.CompUUID={rand_num}", "-tags", "http", "./http"],
+                    ["make Makefile"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,

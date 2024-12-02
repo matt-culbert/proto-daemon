@@ -1,4 +1,5 @@
 import base64
+import os
 from urllib.parse import urlparse
 import hashlib
 import hmac
@@ -57,6 +58,13 @@ logging.basicConfig(
 # Load the default config file
 with open('s_conf.json', 'r') as file:
     config = json.load(file)
+
+# Load the implant config file using a relative path
+config_file_path = os.path.join(os.path.dirname(__file__), '..', 'Implant', 'shared', 'config.json')
+
+# Load the implant config file
+with open(config_file_path, 'r') as file:
+    imp_conf = json.load(file)
 
 # Get the listener names from the config file and add them to a list
 listeners_list = config["listeners"]
@@ -119,7 +127,8 @@ def verify_auth_token(uri, received_token, received_timestamp):
     :param received_timestamp: The timestamp that the token was sent
     :return: bool depending on comparison outcome
     """
-    secret_key = "4321"
+    # Get the value from the implant config json file
+    secret_key = imp_conf["psk2"]
     time_window = 60  # Allow a 60-second window for token validity
     # Ensure the timestamp is within the allowed time window
     current_time = int(time.time())
@@ -412,6 +421,7 @@ def register_routes():
         :param path: This represents the implant ID
         :return: Either the waiting command or error
         """
+        imp_psk1 = imp_conf["psk1"]
         logger.info("GET incoming for authenticated listener URI")
         try:
             logger.info("looks like an encoded request")
@@ -439,7 +449,7 @@ def register_routes():
                 checkout_command(path, operator)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
-                hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+                hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
                 hmac_sig = hmac_k.hexdigest()
                 return jsonify(
                     message=command,
@@ -460,7 +470,7 @@ def register_routes():
                 checkout_command(path, operator)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
-                hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+                hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
                 hmac_sig = hmac_k.hexdigest()
                 return jsonify(
                     message=command,

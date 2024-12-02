@@ -17,22 +17,40 @@ import (
 // 2) The maximum number of retries before giving up
 // 3) The query parameters to include in the request
 // It returns the response and any error that occurred
-func GetDataRequest(baseUrl string, maxRetries int, params url.Values) (*http.Response, error) {
+func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*http.Response, error) {
 	var resp *http.Response
 	var err error
-	reqURL, _ := url.Parse(baseUrl)
-	reqURL.RawQuery = params.Encode()
+
+	// Parse the base URL
+	reqURL, err := url.Parse(baseUrl)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Create an HTTP client
+	client := &http.Client{}
 
 	for attempts := 0; attempts < maxRetries; attempts++ {
-		resp, err = http.Get(reqURL.String())
+		// Create a new request for each attempt
+		req, err := http.NewRequest("GET", reqURL.String(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		// Add cookies to the request
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
+
+		// Send the request
+		resp, err = client.Do(req)
 		if err == nil {
 			// Success, return the response
 			return resp, nil
 		}
 
 		// Log the error and retry after a delay
-		//fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
-		attempts++
+		fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
 		time.Sleep(10 * time.Second)
 	}
 

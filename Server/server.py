@@ -415,7 +415,9 @@ def register_routes():
         logger.info("GET incoming for authenticated listener URI")
         try:
             logger.info("looks like an encoded request")
-            url_decoded_data = urllib.parse.unquote(request.args.get("da"))
+            # Get the cookie holding the encoded data
+            url_decoded_data = request.cookies.get("da")
+            logger.info("got cookies")
             url_decoded_data = url_decoded_data.rstrip("=")  # Remove existing padding
             padding = len(url_decoded_data) % 4
             if padding:
@@ -428,6 +430,7 @@ def register_routes():
 
             rcv_timestamp = parsed_data.get('timestamp')
             rcv_token = parsed_data.get('token')
+            logger.info("got the token and timestamp from cookies")
             if verify_auth_token(path, rcv_token[0], rcv_timestamp[0]) is True:
                 operator, command = get_waiting_command(path)
                 if operator and command is False:
@@ -447,8 +450,8 @@ def register_routes():
                 return "error"
         except Exception as e:
             logger.info(f"{e} occurred")
-            rcv_timestamp = request.args.get('timestamp')
-            rcv_token = request.args.get('token')
+            rcv_timestamp = request.cookies.get('timestamp')
+            rcv_token = request.cookies.get('token')
             if verify_auth_token(path, rcv_token, rcv_timestamp) is True:
                 operator, command = get_waiting_command(path)
                 if operator and command is False:

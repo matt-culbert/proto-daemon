@@ -1,6 +1,16 @@
 {
   "listeners": [
-    {"name": "DefGET", "path":  "/<path:path>", "enabled": "true", "method": "GET"},
-    {"name": "DefPOST", "path":  "/<path:path>", "enabled": "true", "method": "POST"}
+    {
+      "name": "DefGET",
+      "abs_path":"/",
+      "path":  "/<path:path>",
+      "enabled": "true",
+      "method": "GET"},
+    {
+      "name": "DefPOST",
+      "abs_path":"/",
+      "path":  "/<path:path>",
+      "enabled": "true",
+      "method": "POST"}
   ]
 }

@@ -59,11 +59,8 @@ logging.basicConfig(
 with open('s_conf.json', 'r') as file:
     config = json.load(file)
 
-# Load the implant config file using a relative path
-config_file_path = os.path.join(os.path.dirname(__file__), '..', 'Implant', 'shared', 'config.json')
-
 # Load the implant config file
-with open(config_file_path, 'r') as file:
+with open('../Implant/shared/config.json', 'r') as file:
     imp_conf = json.load(file)
 
 # Get the listener names from the config file and add them to a list

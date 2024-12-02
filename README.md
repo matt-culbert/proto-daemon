@@ -68,11 +68,11 @@ go build -ldflags <ldflags> -tags <optional support> ./<dir>
 ```
 #### Example
 ```bash
-go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp withHttp ./Implant/daemon
+go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags "withComp withHttp" ./Implant/daemon
 ```
 #### Or using Garble
 ```bash
-garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp withHttp ./Implant/daemon
+garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags "withComp withHttp" ./Implant/daemon
 ```
 ### Run the CF worker
 The last point to review is the cloudflare worker script. This can be run in the Cloudflare environment but you will probably be banned. So run it locally instead.

@@ -128,7 +128,7 @@ func main() {
 			timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
 			//reqURL.RawQuery = params.Encode()
 			//fmt.Println(reqURL.String())
-			// makeGetRequest 3 times with a 10 second delay between each attempt
+			// makeGetRequest 3 times with a 10-second delay between each attempt
 			// if the request is successful, break the loop
 			// otherwise, the 3 timeouts cause the program to exit
 			resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie)

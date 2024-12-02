@@ -2,18 +2,16 @@
 OUTPUT := program
 
 # Package to build
-PACKAGE := ./http
-
-# Build tags
-PROTO := http
+PACKAGE := ./daemon
 
 # Generate a random UUID-like number (e.g., a random integer between 1000 and 9999)
 RAND_NUM := $(shell shuf -i 1000-9999 -n 1)
 
 # Default build rule
+# Uses HTTP as a default
 build:
 	@echo "Building with random CompUUID=$(RAND_NUM)"
-	go build -ldflags "-X main.CompUUID=$(RAND_NUM)" -tags "$(PROTO)" -o $(OUTPUT) $(PACKAGE)
+	go build -ldflags "-X main.CompUUID=$(RAND_NUM) -X main.PostURI=/ -X main.GetURI=/" -tags "withHttp" -o $(OUTPUT) $(PACKAGE)
 
 # Enable a subset of features (example: only featureA and featureB)
 build_WithLua:

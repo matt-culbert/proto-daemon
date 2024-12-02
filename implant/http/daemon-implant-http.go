@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -115,7 +116,8 @@ func main() {
 		// if false, the params are instead appended to the request uncompressed
 		compedData, boolRes := shared.DoComp(hardVals)
 		if boolRes {
-			params.Add(string(compedData.String()), "")
+			encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
+			params.Add("da", encodedData)
 		} else {
 			params.Add("token", token)
 			params.Add("timestamp", timestamp)

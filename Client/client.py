@@ -167,7 +167,8 @@ if __name__ == "__main__":
                         build_implant(uname, session_token, garbled, "http")
                     case "dns":
                         print("Building for DNS")
+                        build_implant(uname, session_token, garbled, "dns")
                     case _:
                         print("Enter either DNS or HTTP")
             case _:
-                print("Enter either 1 or 2 \n")
+                print("Unexpected command \n")

@@ -1,4 +1,6 @@
-### First use
+### Before first use
+This covers the initial setup of required things like the Python requirements and how to generate a user.
+
 Install required Python modules
 ```bash
 pip3 install requirements.txt
@@ -15,16 +17,19 @@ Generate the SSL cert for the server to secure connections with
 ```bash
 openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
 ```
-Start the server
+
+### Run the application
+1) First, start the server
 ```bash
 python Server/server.py
 ```
-Start the client and enter the username/password you generated
+2) After the server is started, start the client and enter the username/password you generated. The server needs to be run first since the client tries to authenticate after you enter your details.
 ```bash
 python Client/client.py
 ```
 
 ### Powershell commands for simulating implant
+These have proven handy for emulating implant testing to the server without having to run an implant itself. 
 ```powershell
 $postParams = @{"msg" = "7465:7374::"}
 $jsonPost = $postParams | ConvertTo-Json 
@@ -35,36 +40,42 @@ Invoke-WebRequest -Uri http://127.0.0.1:5000/1234 -Method POST -Body $jsonPost -
 ```
 
 ### Compiling Go exe
-#### Syntax
-```bash
-go build -ldflags "-X main.CompUUID=<ImplantID>" -tags <protocol> ./<dir>
-```
-#### Example
-```bash
-go build -ldflags "-X main.CompUUID=5678" -tags http ./http
-```
-#### Or using Garble
-```bash
-garble build -ldflags "-X main.CompUUID=5678" -tags http ./http
-```
+These should be handled by the Makefile, but if you're curious about what's supported or you want to compile the implant manually, this is what's required.
+
+There are tags and ldflags that setup things like the callback URLs, implant ID, and enable supported features.
 #### Compile flag options
 ```bash
 # Implant UUID
 # Expects a random but unique 4 digit integer
 -X main.CompUUID 
 # POST URI to use 
-# Possible POST options are `/` or `/un/`
+# Default POST option is `/` or use other listeners you have made
 -X main.PostURI 
 # GET URI to use
-# Possible GET options are `/` or `/auth/` or `/direct/`
+# Default GET option is `/` or use other listeners you have made
 -X main.GetURI
 ```
 #### Compile tag options
 ```bash
-withComp - Enable zlib compression
-withLua - Enable support for Lua scripting
+# Enable zlib compression
+withComp 
+# Enable support for Lua scripting
+withLua 
+```
+#### Syntax
+```bash
+go build -ldflags <ldflags> -tags <optional support> ./<dir>
+```
+#### Example
+```bash
+go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp ./http
+```
+#### Or using Garble
+```bash
+garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp ./http
 ```
 ### Run the CF worker
+The last point to review is the cloudflare worker script. This can be run in the Cloudflare environment but you will probably be banned. So run it locally instead.
 ```bash
 npx wrangler dev .\cf-worker.js
 ```

@@ -1,12 +1,11 @@
 /__pycache__
 /.idea
-pubsub.log
 *.log
 *.pkl
 *.pem
-*.json
+/node_modules
 *.map
-.wrangler/*
+/.wrangler
 *.exe
-*.wrangler
 *.pyc
+/Server/__pycache__

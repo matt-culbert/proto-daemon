@@ -371,6 +371,18 @@ def handle_client(client_socket):
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token")
 
+            case "RFR":
+                logger.info("refreshing routes")
+                request_type, uname, token, *message = client_request.split(" ", 3)
+                if token in operator_session_tokens:
+                    deregister_routes()
+                    register_routes()
+                    logger.info("refreshed routes")
+                    client_socket.send(f"Routes refreshed".encode())
+                else:
+                    client_socket.send(f"Bad token\n".encode())
+                    logger.error("bad token, couldn't refresh routes")
+
             case _:
                 logger.error(f"unknown command: {request_type}")
                 client_socket.send("Unknown command\n".encode())
@@ -482,6 +494,24 @@ def register_routes():
 
 # Register routes initially
 register_routes()
+
+
+def deregister_routes():
+    """Deregister all currently registered routes."""
+    global route_functions
+    routes_to_remove = list(route_functions.keys())
+
+    # Iterate through all rules and remove them if their endpoint is in route_functions
+    rules_to_remove = [
+        rule for rule in app.url_map.iter_rules() if rule.endpoint in routes_to_remove
+    ]
+
+    for rule in rules_to_remove:
+        app.view_functions.pop(rule.endpoint, None)
+        logger.info(f"Route '{rule.endpoint}' at path '{rule.rule}' removed")
+
+    # Clear stored route functions after deregistering them
+    route_functions.clear()
 
 
 @app.before_request

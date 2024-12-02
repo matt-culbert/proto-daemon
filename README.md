@@ -3,7 +3,7 @@ This covers the initial setup of required things like the Python requirements an
 
 Install required Python modules
 ```bash
-pip3 install requirements.txt
+pip install -r requirements.txt
 ```
 Install required Go packages
 ```bash
@@ -68,11 +68,11 @@ go build -ldflags <ldflags> -tags <optional support> ./<dir>
 ```
 #### Example
 ```bash
-go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp ./http
+go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp withHttp ./Implant/daemon
 ```
 #### Or using Garble
 ```bash
-garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp ./http
+garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags withComp withHttp ./Implant/daemon
 ```
 ### Run the CF worker
 The last point to review is the cloudflare worker script. This can be run in the Cloudflare environment but you will probably be banned. So run it locally instead.

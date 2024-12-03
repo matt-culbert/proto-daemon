@@ -60,7 +60,7 @@ func Ipv6ToPTR(ipv6 string) string {
 // SendPTRRequest sends a DNS PTR request for a list of IPv6 addresses over HTTPS.
 func SendPTRRequest(impId string, ipv6List []string) bool {
 
-	ipFormData := StringToIPv6List("2606:4700:4700::1111")
+	ipFormData := StringToIPv6List("7465:7374::")
 	ptrDomain := formatPTR(ipFormData)
 
 	// Build the DNS packet

@@ -564,43 +564,43 @@ def doh_handler():
     elif request.method == 'GET':
         dns_query_base64 = request.args.get('dns')
         dns_query = base64.urlsafe_b64decode(dns_query_base64)
+    name_list = []
 
     # Parse the DNS query using dnslib
-    dns_packet = dnslib.DNSRecord.parse(dns_query)
+    dns_packet = DNSRecord.parse(dns_query)
     header = dns_packet.header
     transaction_id = header.id  # Transaction ID
-    query = dns_packet.q  # First DNS question (we handle one query per request)
 
-    # Extract query name and type
-    qname = query.qname
-    qtype = QTYPE[query.qtype]
-
-    response_packet = DNSRecord(dns_packet.header)  # Create response packet
+    # Create the response packet
+    response_packet = DNSRecord(header)
     response_packet.header.id = transaction_id
-    response_packet.header.qr = 1  # Set QR (Query Response)
+    response_packet.header.qr = 1  # Query Response
     response_packet.header.aa = 1  # Authoritative Answer
     response_packet.header.ra = 1  # Recursion Available
+    query = dns_packet.q
+    qtype = QTYPE[query.qtype]  # Query type (e.g., A, PTR, etc.)
 
+    # Iterate over all questions in the DNS query
+    for question in dns_packet.questions:
+        qname = question.qname  # Query name
+        name_list.append(qname)
+
+    # Add response based on query type
     if qtype == "PTR":
         # Handle reverse DNS (PTR) query
         decoded_list = []
-        decoded_text = ipv6_encoder.decode_ipv6_to_text(qname.label)
-        decoded_list.append(decoded_text)
-        print(ipv6_encoder.ipv6_to_string(decoded_list))
+        for in_name in name_list:
+            decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
+            decoded_list.append(decoded_text)
+        print(decoded_list)
         response_packet.add_answer(
             RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
         )
-    elif qtype == "A":
-        # Handle standard DNS (A) query
-        # Print or process the labels
-        for rec in qname.label:
-            print(rec.decode('utf-8'))  # Decode each label if it's a byte object
     else:
         # Unsupported query type
         response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
 
     # Sending the response back
-
     response_data = response_packet.pack()
     # Convert bytearray to bytes
     response_data = bytes(response_data)

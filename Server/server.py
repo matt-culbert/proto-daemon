@@ -591,8 +591,8 @@ def doh_handler():
         decoded_list = []
         for in_name in name_list:
             decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
-            decoded_list.append(decoded_text)
-        print(decoded_list)
+            decoded_list.append(decoded_text.strip('\x00'))
+        print(ipv6_encoder.ipv6_to_string(decoded_list))
         response_packet.add_answer(
             RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
         )

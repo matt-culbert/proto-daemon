@@ -1,5 +1,3 @@
-//go:build withHttp
-
 package shared
 
 import (
@@ -8,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -18,22 +17,29 @@ import (
 // 3) The query parameters to include in the request
 // It returns the response and any error that occurred
 func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*http.Response, error) {
+	fmt.Println("In GetDataRequest")
 	var resp *http.Response
 	var err error
 
 	// Parse the base URL
 	reqURL, err := url.Parse(baseUrl)
+	fmt.Printf("Parsing req URL %s\n", reqURL)
 	if err != nil {
+		fmt.Println(err)
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
 	// Create an HTTP client
 	client := &http.Client{}
+	fmt.Println("Created client")
 
 	for attempts := 0; attempts < maxRetries; attempts++ {
 		// Create a new request for each attempt
+		fmt.Println("Attempt #" + strconv.Itoa(attempts))
 		req, err := http.NewRequest("GET", reqURL.String(), nil)
+		fmt.Printf("%v\n", req)
 		if err != nil {
+			fmt.Println(err)
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
 
@@ -44,7 +50,9 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 
 		// Send the request
 		resp, err = client.Do(req)
+		fmt.Printf("%v\n", resp)
 		if err == nil {
+
 			// Success, return the response
 			return resp, nil
 		}

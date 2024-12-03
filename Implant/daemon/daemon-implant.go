@@ -60,7 +60,7 @@ func main() {
 		// if false, the params are instead appended to the request uncompressed
 		compedData, boolRes := shared.DoComp(hardVals)
 		if boolRes {
-			fmt.Println("Compressing data")
+			//fmt.Println("Compressing data")
 			encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
 			tokenCookie := &http.Cookie{Name: "da", Value: encodedData}
 			// makeGetRequest 3 times with a 10 second delay between each attempt
@@ -140,7 +140,7 @@ func main() {
 				break
 			}
 		} else {
-			fmt.Println("Not compressing data")
+			//fmt.Println("Not compressing data")
 			tokenCookie := &http.Cookie{Name: "token", Value: token}
 			timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
 			//reqURL.RawQuery = params.Encode()
@@ -150,7 +150,7 @@ func main() {
 			// otherwise, the 3 timeouts cause the program to exit
 			resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie)
 			if err != nil {
-				fmt.Println("Final error:", err)
+				//fmt.Println("Final error:", err)
 				return
 			}
 			// Defer closing the response body until the for loop breaks
@@ -188,12 +188,12 @@ func main() {
 
 			// The response comes encoded in a hex format that mimics IPv6 IPs
 			// Decode that data
-			decoded, err := shared.DecodeIPv6ToString(data.Message)
+			_, err = shared.DecodeIPv6ToString(data.Message)
 			if err != nil {
-				fmt.Println(err)
+				//fmt.Println(err)
 				break
 			}
-			fmt.Println("Decoded string:", decoded)
+			//fmt.Println("Decoded string:", decoded)
 
 			// Verify the message with the received HMAC
 			if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {

@@ -106,25 +106,25 @@ func SendPTRRequest(impId string, ipv6List []string) bool {
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{}}}
 	req, err := http.NewRequest("POST", "http://127.0.0.1:5000/dns-query", &dnsPacket)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		// fmt.Println("Error creating request:", err)
 		return false
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error making DoH request:", err)
+		// fmt.Println("Error making DoH request:", err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	// Read and display the response
-	body, err := io.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response:", err)
+		// fmt.Println("Error reading response:", err)
 		return false
 	}
-	fmt.Printf("Raw DoH Response: %x\n", body)
+	// fmt.Printf("Raw DoH Response: %x\n", body)
 
 	return true
 }

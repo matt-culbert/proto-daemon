@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Byte array which holds the config file embedded at compile time
@@ -40,13 +41,27 @@ func LoadConfig() (Config, error) {
 // DecodeIPv6ToString takes a string formatted like an IPv6 address (e.g., ["7465:7374::"])
 // and decodes it back into its original string representation.
 func DecodeIPv6ToString(encoded string) (string, error) {
-
 	// Remove all non-hexadecimal characters from the encoded string
 	hexParts := strings.ReplaceAll(encoded, `"`, "")
 	hexParts = strings.ReplaceAll(hexParts, `[`, "")
 	hexParts = strings.ReplaceAll(hexParts, `]`, "")
 	hexParts = strings.ReplaceAll(hexParts, `:`, "")
 	hexParts = strings.ReplaceAll(hexParts, `,`, "")
+
+	// Remove spaces and any non-hex characters explicitly
+	hexParts = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || !unicode.Is(unicode.Hex_Digit, r) {
+			return -1 // Skip non-hex characters
+		}
+		return r
+	}, hexParts)
+
+	// Pad the hex string if its length is odd
+	if len(hexParts)%2 != 0 {
+		hexParts = "0" + hexParts
+	}
+
+	// Decode the hex string into bytes
 	result, err := hex.DecodeString(hexParts)
 	if err != nil {
 		return "", err

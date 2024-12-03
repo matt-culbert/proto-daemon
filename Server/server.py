@@ -583,16 +583,28 @@ def doh_handler():
 
     if qtype == "PTR":
         # Handle reverse DNS (PTR) query
-        print(ipv6_encoder.ipv6_to_string(qname))
+        decoded_list = []
+        decoded_text = ipv6_encoder.decode_ipv6_to_text(qname.label)
+        decoded_list.append(decoded_text)
+        print(ipv6_encoder.ipv6_to_string(decoded_list))
+        response_packet.add_answer(
+            RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
+        )
     elif qtype == "A":
         # Handle standard DNS (A) query
-        print(ipv6_encoder.ipv6_to_string(qname))
+        # Print or process the labels
+        for rec in qname.label:
+            print(rec.decode('utf-8'))  # Decode each label if it's a byte object
     else:
         # Unsupported query type
         response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
 
-    # Send the DNS response back
+    # Sending the response back
+
     response_data = response_packet.pack()
+    # Convert bytearray to bytes
+    response_data = bytes(response_data)
+    logger.info(f"sending response: {response_data} {type(response_data)}")
     return Response(response_data, content_type="application/dns-message")
 
 

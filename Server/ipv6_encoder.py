@@ -1,6 +1,30 @@
 import ipaddress
 
 
+def decode_ipv6_to_text(encoded_str):
+    encoded_str = '.'.join(b.decode('ascii') for b in encoded_str)
+    print(encoded_str)
+    # Step 1: Remove the '.ip6.arpa' suffix
+    if encoded_str.endswith(".ip6.arpa"):
+        encoded_str = encoded_str[:-9]
+    else:
+        raise ValueError("Invalid format: missing .ip6.arpa")
+
+    # Step 2: Split the string by the dots and reverse the order
+    hex_parts = encoded_str.split('.')
+    hex_parts.reverse()
+
+    # Step 3: Combine every two parts into one hex byte and convert it to a character
+    original_bytes = bytearray()
+    for i in range(0, len(hex_parts), 2):
+        hex_byte = hex_parts[i] + hex_parts[i + 1]
+        original_bytes.append(int(hex_byte, 16))
+
+    # Step 4: Convert the bytearray to the original string
+    original_text = original_bytes.decode('utf-8')
+    return original_text
+
+
 def string_to_ipv6(data: str) -> list:
     """
     Encode a string into a list of IPv6 addresses.

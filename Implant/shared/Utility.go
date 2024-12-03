@@ -114,19 +114,3 @@ func GetSelfHash() []byte {
 	}
 	return hasher.Sum(nil)
 }
-
-// Ipv6ToPTR converts an IPv6 address to its reverse DNS (PTR) format.
-func Ipv6ToPTR(ipv6 string) string {
-	// Remove colons and expand zeros to ensure 32 hexadecimal characters
-	ipv6 = strings.ReplaceAll(ipv6, ":", "")
-	if len(ipv6) < 32 {
-		ipv6 = fmt.Sprintf("%032s", ipv6)
-	}
-
-	// Reverse the hex characters and append ".ip6.arpa."
-	var reversedHex []string
-	for i := len(ipv6) - 1; i >= 0; i-- {
-		reversedHex = append(reversedHex, string(ipv6[i]))
-	}
-	return strings.Join(reversedHex, ".") + ".ip6.arpa"
-}

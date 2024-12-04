@@ -12,5 +12,18 @@
       "path":  "/<path:path>",
       "enabled": "true",
       "method": "POST"}
+  ],
+  "custom_listeners": [
+    {
+      "name": "my_route",
+      "abs_path":"/custom_route",
+      "path":  "/custom_route",
+      "enabled": "true",
+      "method": "GET",
+      "use_auth": "true",
+      "use_comp": "true",
+      "use_dns": "true",
+      "use_http": "false"
+    }
   ]
 }

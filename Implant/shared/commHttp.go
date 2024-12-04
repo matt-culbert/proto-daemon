@@ -44,6 +44,7 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 
 		// Add cookies to the request
 		for _, cookie := range cookies {
+			fmt.Println(cookie)
 			req.AddCookie(cookie)
 		}
 
@@ -70,25 +71,61 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 // 1) The base URL to make the request to
 // 2) The params of the message
 // It returns the response and any error that occurred
-func SendDataRequest(baseUrl string, params string) (*http.Response, error) {
-	reqURL, _ := url.Parse(baseUrl)
-	// Create the data payload
+func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*http.Cookie) (*http.Response, error) {
+	var resp *http.Response
+
 	data := map[string]string{
 		"msg": params,
 	}
-
-	// Marshal the data to JSON
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling JSON: %v", err)
 	}
 
-	// Send the HTTP POST request
-	resp, err := http.Post(reqURL.String(), "application/json", bytes.NewBuffer(jsonData))
-
+	// Parse the base URL
+	reqURL, err := url.Parse(baseUrl)
+	//fmt.Printf("Parsing req URL %s\n", reqURL)
 	if err != nil {
-		return nil, fmt.Errorf("error sending POST request: %v", err)
+		fmt.Println(err)
+		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	return resp, nil
+	// Create an HTTP client
+	client := &http.Client{}
+	//fmt.Println("Created client")
+
+	for attempts := 0; attempts < maxRetries; attempts++ {
+		// Create a new request for each attempt
+		//fmt.Println("Attempt #" + strconv.Itoa(attempts))
+		req, err := http.NewRequest("POST", reqURL.String(), bytes.NewBuffer(jsonData))
+		//fmt.Printf("%v\n", req)
+		if err != nil {
+			//fmt.Println(err)
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		// Add cookies to the request
+		for _, cookie := range cookies {
+			fmt.Println(cookie)
+			req.AddCookie(cookie)
+		}
+
+		req.Header.Add("Content-Type", "application/json")
+
+		// Send the request
+		resp, err = client.Do(req)
+		//fmt.Printf("%v\n", resp)
+		if err == nil {
+
+			// Success, return the response
+			return resp, nil
+		}
+
+		// Log the error and retry after a delay
+		fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
+		time.Sleep(10 * time.Second)
+	}
+
+	// Return the last error after exhausting retries
+	return nil, fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
 }

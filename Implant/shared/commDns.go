@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -106,12 +107,15 @@ func SendPTRRequest(impId uint16, ipv6List []string) bool {
 
 	// Send the packet over HTTPS
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{}}}
-	req, err := http.NewRequest("POST", "http://127.0.0.1:5000/dns-query", &dnsPacket)
+	req, err := http.NewRequest("POST", "http://127.0.0.1:5000/", &dnsPacket)
 	if err != nil {
 		// fmt.Println("Error creating request:", err)
 		return false
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
+	impIdStr := strconv.Itoa(int(impId))
+	idCookie := &http.Cookie{Name: "id", Value: impIdStr}
+	req.AddCookie(idCookie)
 
 	resp, err := client.Do(req)
 	if err != nil {

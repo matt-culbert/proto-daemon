@@ -567,17 +567,16 @@ def register_routes():
 # Register routes initially
 register_routes()
 
-'''
+
 @app.before_request
 def restrict_routes():
     """Middleware to block disabled routes."""
     logger.info(f"checking if route is enabled: {request.path} {request.method}")
     # Check if the request path matches a disabled route
-    if request.url_rule.rule in route_status:
+    if request.url_rule.rule in route_status or request.url_rule is None:
         if find_get_val(request.method):
             logger.warning(f"disabled route accessed: {request.path} {request.method}")
             abort(404)  # Return a 404 if the route is disabled
-'''
 
 
 @app.route('/dns-query', methods=['GET', 'POST'])

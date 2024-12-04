@@ -2,7 +2,6 @@ package shared
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -105,8 +104,8 @@ func SendPTRRequest(impId uint16, ipv6List []string) bool {
 		binary.Write(&dnsPacket, binary.BigEndian, question)
 	}
 
-	// Send the packet over HTTPS
-	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{}}}
+	// Send the packet over HTTP
+	client := &http.Client{}
 	req, err := http.NewRequest("POST", "http://127.0.0.1:5000/", &dnsPacket)
 	if err != nil {
 		// fmt.Println("Error creating request:", err)
@@ -122,7 +121,12 @@ func SendPTRRequest(impId uint16, ipv6List []string) bool {
 		// fmt.Println("Error making DoH request:", err)
 		return false
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			return
+		}
+	}(resp.Body)
 
 	// Read and display the response
 	_, err = io.ReadAll(resp.Body)

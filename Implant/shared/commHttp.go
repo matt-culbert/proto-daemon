@@ -24,7 +24,7 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 	reqURL, err := url.Parse(baseUrl)
 	//fmt.Printf("Parsing req URL %s\n", reqURL)
 	if err != nil {
-		fmt.Println(err)
+		//fmt.Println(err)
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
@@ -44,7 +44,7 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 
 		// Add cookies to the request
 		for _, cookie := range cookies {
-			fmt.Println(cookie)
+			//fmt.Println(cookie)
 			req.AddCookie(cookie)
 		}
 
@@ -86,7 +86,7 @@ func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*
 	reqURL, err := url.Parse(baseUrl)
 	//fmt.Printf("Parsing req URL %s\n", reqURL)
 	if err != nil {
-		fmt.Println(err)
+		//fmt.Println(err)
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
@@ -106,7 +106,7 @@ func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*
 
 		// Add cookies to the request
 		for _, cookie := range cookies {
-			fmt.Println(cookie)
+			//fmt.Println(cookie)
 			req.AddCookie(cookie)
 		}
 

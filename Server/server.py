@@ -373,9 +373,9 @@ def handle_client(client_socket):
         match request_type:
             case "AUTH":
                 logger.info("authenticating user")
-                request_type, uname, passwd = client_request.split(" ", 2)
+                request_type, uname, token = client_request.split(" ", 2)
                 logger.info(f"checking authentication details for {uname}")
-                if pw_hash.compare_hash(uname, passwd):
+                if pw_hash.compare_hash(uname, token):
                     logger.info("user authenticated, generating session token")
                     returned_token = secrets.token_hex()
                     client_socket.send(returned_token.encode())
@@ -385,7 +385,7 @@ def handle_client(client_socket):
 
             case "PUB":
                 logger.info("request to send command, attempting")
-                request_type, implant_id, uname, token, *command = client_request.split(" ", 4)
+                request_type,  uname, token, implant_id, *command = client_request.split(" ", 4)
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
                     command = command[0] if command else ""

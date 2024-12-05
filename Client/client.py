@@ -69,9 +69,13 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
             publish_request = f"RFR {operator_name} {session_token}"
 
     secure_client_socket.send(publish_request.encode())
-    response = secure_client_socket.recv(4096).decode()
-    print(f"Server response: {response}")
-    secure_client_socket.close()
+
+    while True:
+        response = secure_client_socket.recv(4096).decode()
+        if not response:
+            break
+        print(f"Server response: {response}")
+    # secure_client_socket.close()
 
 
 if __name__ == "__main__":

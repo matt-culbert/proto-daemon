@@ -511,7 +511,7 @@ def register_routes():
                 )
             else:
                 logger.error(f"error: verify_auth_token failed")
-                return "error"
+                abort(404)
         else:
             logger.info("uncompressed data")
             rcv_timestamp = request.cookies.get('timestamp')
@@ -535,7 +535,7 @@ def register_routes():
                 )
             else:
                 logger.info("verifying auth failed")
-                return 404
+                abort(404)
 
 
     @app.route(listeners_list[1]['path'], methods=['POST'])

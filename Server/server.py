@@ -1,7 +1,7 @@
 import base64
 import importlib
 import uuid
-
+import signal
 from dnslib import QTYPE, DNSRecord, RR, PTR
 from urllib.parse import urlparse
 import hashlib
@@ -301,7 +301,7 @@ def get_results_by_implant(user_id, implant_id):
             value = entry.pop(implant_id)
             if not entry:  # If the dictionary is empty after pop, remove it from the list
                 user_results.pop(i)
-            return value
+            return "Implant returned > " + value
     return None  # Return None if no matching implant_id is found
 
 
@@ -372,6 +372,12 @@ def checkout_command(imp_id, user_id):
     implant_checkout[imp_id].put(user_id)
 
 
+# Graceful shutdown handler
+def handle_shutdown(thread_name):
+    print("Shutting down...")
+    thread_name.terminate()
+
+
 def handle_client(client_socket, client_id):
     """
     Handles the client sending and retrieving info
@@ -385,9 +391,6 @@ def handle_client(client_socket, client_id):
 
         # Check what type of message it is first before processing further
         request_type, uname, *remainder = client_request.split(" ", 2)
-        pending_res = get_unique_results_for_user(uname)
-        if pending_res is not False and request_type != "RTR":
-            client_socket.send(f"Results from implant(s) {pending_res} pending for you".encode())
 
         match request_type:
             case "AUTH":
@@ -400,7 +403,7 @@ def handle_client(client_socket, client_id):
                     client_socket.send(returned_token.encode())
                     operator_session_tokens.add(returned_token)
                 else:
-                    client_socket.send("Bad username or password\n".encode())
+                    client_socket.send("Bad username or password :red".encode())
 
             case "PUB":
                 logger.info("request to send command, attempting")
@@ -409,11 +412,11 @@ def handle_client(client_socket, client_id):
                 if token in operator_session_tokens:
                     command = command[0] if command else ""
                     add_command(implant_id, uname, command)
-                    client_socket.send("Command queued".encode())
-                    logger.info(f"Command: {command} added to queue for implant: {implant_id}")
+                    client_socket.send("Command queued :blue".encode())
+                    logger.info(f"Command: {command} added to queue for implant: {implant_id} :blue")
                 else:
+                    client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")
-                    client_socket.send("Bad token\n".encode())
 
             case "RTR":
                 logger.info("controller requesting implant last messages")
@@ -421,10 +424,11 @@ def handle_client(client_socket, client_id):
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
                     results = get_results_by_implant(uname, implant_id)
+                    results = results + ":green"
                     client_socket.send(results.encode())
                     logger.info(f"sent controller results {results}")
                 else:
-                    client_socket.send(f"Bad token\n".encode())
+                    client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")
 
             case "BLD":
@@ -435,21 +439,21 @@ def handle_client(client_socket, client_id):
                     if garbler == "y":
                         bld_status = garble_implant(message[0])
                         if bld_status is True:
-                            client_socket.send("Garbling implant succeeded!".encode())
+                            client_socket.send("Garbling implant succeeded! :blue".encode())
                         else:
-                            client_socket.send("Garbling implant failed...".encode())
+                            client_socket.send("Garbling implant failed... :red".encode())
                     if garbler == "n":
                         bld_status = build_implant(message[0])
                         if bld_status is True:
-                            client_socket.send("Building implant succeeded!".encode())
+                            client_socket.send("Building implant succeeded! :blue".encode())
                         else:
-                            client_socket.send("Building implant failed...".encode())
+                            client_socket.send("Building implant failed... :red".encode())
                     else:
-                        client_socket.send("Not able to build, see log...".encode())
+                        client_socket.send("Not able to build, see log... :yellow".encode())
                         logger.error(f"unknown error occurred when trying to build {request_type} {uname} token"
                                      f" {garbler} {message[0]}")
                 else:
-                    client_socket.send(f"Bad token\n".encode())
+                    client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")
 
             case "RFR":
@@ -461,18 +465,22 @@ def handle_client(client_socket, client_id):
                     # Register the user Blueprints
                     register_blueprints(bp_name)
                     logger.info("refreshed routes/blueprints")
-                    client_socket.send(f"Routes refreshed and Blueprints loaded".encode())
+                    client_socket.send(f"Routes refreshed and Blueprints loaded :blue".encode())
                 else:
-                    client_socket.send(f"Bad token\n".encode())
+                    client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token, couldn't refresh routes")
 
             case "EMT":
                 logger.info("empty request, client app refreshing")
                 request_type, uname, token, *message = client_request.split(" ", 3)
                 if token in operator_session_tokens:
-                    client_socket.send("Token authenticated".encode())
+                    to_send = "Token authenticated :blue"
+                    pending_res = get_unique_results_for_user(uname)
+                    if pending_res is not False and request_type != "RTR":
+                        to_send = f"Results from implant(s) {pending_res} pending for you :green"
+                    client_socket.send(to_send.encode())
                 else:
-                    client_socket.send(f"Bad token\n".encode())
+                    client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")
 
             case _:
@@ -708,6 +716,9 @@ def start_server():
         # Start a new thread to handle this client
         client_handler = threading.Thread(target=handle_client, args=(client_socket, client_id))
         client_handler.start()
+
+        # Kill flask_thread and client_handler
+
 
 
 if __name__ == "__main__":

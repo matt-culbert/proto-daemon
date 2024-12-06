@@ -79,7 +79,8 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
         response = secure_client_socket.recv(4096).decode()
         if not response:
             break
-        cprint(f"Server response: {response}", "blue")
+        server_msg, msg_color = response.split(":")
+        cprint(f"Server response: {server_msg}", msg_color)
     # secure_client_socket.close()
 
 

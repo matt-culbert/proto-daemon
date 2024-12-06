@@ -10,3 +10,4 @@
 *.pyc
 /Server/__pycache__
 /Server/__pycache__
+*.pyc

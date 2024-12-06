@@ -302,7 +302,7 @@ def get_results_by_implant(user_id, implant_id):
             if not entry:  # If the dictionary is empty after pop, remove it from the list
                 user_results.pop(i)
             return "Implant returned > " + value
-    return None  # Return None if no matching implant_id is found
+    return "No results currently pending for the provided ID"  # Return None if no matching implant_id is found
 
 
 def get_waiting_command(implant_id):

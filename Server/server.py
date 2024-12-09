@@ -300,7 +300,7 @@ def get_results_by_implant(user_id, implant_id):
 
             return f"Command > '{set_command}' Result > '{result}'"
 
-    return "No matching entry found", None
+    return False
 
 
 def get_waiting_command(implant_id):
@@ -330,12 +330,9 @@ def get_unique_results_for_user(user_id):
     :return: A set of unique implant IDs with pending results for the user.
     """
     user_results = result_storage.get(user_id, [])
-    if not user_results:
-        return False  # No entries for this user
-    unique_client_ids = set()
-    for entry in user_results:
-        unique_client_ids.update(entry.keys())
-    return unique_client_ids
+    # Create a set of keys (implant IDs) for all entries in the user's result list
+    unique_client_ids = {key for entry in user_results for key in entry}
+    return unique_client_ids  # Will return an empty set if no entries are found
 
 
 def handle_update(uname, implant_id, result, set_command):
@@ -418,9 +415,13 @@ def handle_client(client_socket, client_id):
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
                     results = get_results_by_implant(uname, implant_id)
-                    results = results + ":green"
-                    client_socket.send(results.encode())
-                    logger.info(f"sent controller results {results}")
+                    if results:
+                        results = results + ":green"
+                        client_socket.send(results.encode())
+                        logger.info(f"sent controller results {results}")
+                    else:
+                        client_socket.send("No pending data".encode())
+                        logger.info(f"sent controller results {results}")
                 else:
                     client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")
@@ -470,7 +471,7 @@ def handle_client(client_socket, client_id):
                 if token in operator_session_tokens:
                     to_send = "Token authenticated :blue"
                     pending_res = get_unique_results_for_user(uname)
-                    if pending_res is not False and request_type != "RTR":
+                    if pending_res and request_type != "RTR":
                         to_send = f"Results from implant(s) {pending_res} pending for you :green"
                     client_socket.send(to_send.encode())
                 else:

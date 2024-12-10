@@ -1,3 +1,5 @@
+//go:build withHttp
+
 package shared
 
 import (
@@ -71,15 +73,14 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 // 1) The base URL to make the request to
 // 2) The params of the message
 // It returns the response and any error that occurred
-func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*http.Cookie) (*http.Response, error) {
-	var resp *http.Response
+func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*http.Cookie) error {
 
 	data := map[string]string{
 		"msg": params,
 	}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling JSON: %v", err)
+		return fmt.Errorf("error marshaling JSON: %v", err)
 	}
 
 	// Parse the base URL
@@ -87,7 +88,7 @@ func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*
 	//fmt.Printf("Parsing req URL %s\n", reqURL)
 	if err != nil {
 		//fmt.Println(err)
-		return nil, fmt.Errorf("invalid URL: %w", err)
+		return fmt.Errorf("invalid URL: %w", err)
 	}
 
 	// Create an HTTP client
@@ -101,7 +102,7 @@ func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*
 		//fmt.Printf("%v\n", req)
 		if err != nil {
 			//fmt.Println(err)
-			return nil, fmt.Errorf("failed to create request: %w", err)
+			return fmt.Errorf("failed to create request: %w", err)
 		}
 
 		// Add cookies to the request
@@ -113,12 +114,11 @@ func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*
 		req.Header.Add("Content-Type", "application/json")
 
 		// Send the request
-		resp, err = client.Do(req)
-		//fmt.Printf("%v\n", resp)
+		_, err = client.Do(req)
 		if err == nil {
 
 			// Success, return the response
-			return resp, nil
+			return nil
 		}
 
 		// Log the error and retry after a delay
@@ -127,5 +127,5 @@ func SendDataRequest(baseUrl string, params string, maxRetries int, cookies ...*
 	}
 
 	// Return the last error after exhausting retries
-	return nil, fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
+	return fmt.Errorf("failed to fetch URL after %d attempts: %w", maxRetries, err)
 }

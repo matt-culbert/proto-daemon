@@ -3,11 +3,11 @@
 package shared
 
 import (
-	lua "github.com/yuin/gopher-lua"
+	si "z1z1z1z1/a"
 )
 
 func DoLua(LuaStr string) bool {
-	L := lua.NewState()
+	L := si.NewState()
 	L.OpenLibs()
 	defer L.Close()
 	if err := L.DoString(LuaStr); err != nil {

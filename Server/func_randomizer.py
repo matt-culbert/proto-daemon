@@ -37,7 +37,8 @@ def rename_functions(file_content):
 
     # Replace all other references to the renamed functions in the file
     for original_name, new_name in name_map.items():
-        updated_content = re.sub(rf'\b{re.escape(original_name)}\b', new_name, updated_content)
+        if original_name != "main":
+            updated_content = re.sub(rf'\b{re.escape(original_name)}\b', new_name, updated_content)
 
     return updated_content, name_map
 
@@ -79,7 +80,7 @@ def process_directory(input_dir, output_dir):
 
 
 def main():
-    input_dir = "../Implant/daemon"  # Directory containing original source files
+    input_dir = "../Implant/"  # Directory containing original source files
     output_dir = "../Implant/preprocessor"  # Directory to hold preprocessed files
 
     print(f"Copying files from {input_dir} to {output_dir} and renaming functions...")

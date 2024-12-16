@@ -3,9 +3,7 @@ package shared
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	_ "embed"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -14,29 +12,6 @@ import (
 	"time"
 	"unicode"
 )
-
-// Byte array which holds the config file embedded at compile time
-//
-//go:embed config.json
-var configData []byte // Embedded config data
-
-// Config struct to hold configuration
-type Config struct {
-	Listener string `json:"listener"`
-	Id       string `json:"id"`
-	Sleep    string `json:"sleep"`
-	Psk1     string `json:"psk1"`
-	Psk2     string `json:"psk2"`
-}
-
-// Function to load configuration from embedded JSON
-func LoadConfig() (Config, error) {
-	var config Config
-	if err := json.Unmarshal(configData, &config); err != nil {
-		return Config{}, err
-	}
-	return config, nil
-}
 
 // DecodeIPv6ToString takes a string formatted like an IPv6 address (e.g., ["7465:7374::"])
 // and decodes it back into its original string representation.

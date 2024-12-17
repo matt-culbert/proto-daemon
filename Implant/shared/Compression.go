@@ -7,7 +7,6 @@ import (
 	"compress/zlib"
 	_ "embed"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 )
@@ -19,7 +18,11 @@ var configData []byte // Embedded config data
 
 // Config struct to hold configuration
 type Config struct {
-	Listener string `json:"listener"`
+	Method   string `json:"method"`
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	GetPath  string `json:"get_path"`
+	PostPath string `json:"post_path"`
 	Id       string `json:"id"`
 	Sleep    string `json:"sleep"`
 	Psk1     string `json:"psk1"`
@@ -84,11 +87,5 @@ func LoadConfig() (Config, error) {
 		log.Println("Failed to unmarshal JSON:", err)
 		return config, err
 	}
-	fmt.Println("Decompressed Configuration:")
-	fmt.Printf("Listener: %s\n", config.Listener)
-	fmt.Printf("Sleep: %s\n", config.Sleep)
-	fmt.Printf("ID: %s\n", config.Id)
-	fmt.Printf("PSK1: %s\n", config.Psk1)
-	fmt.Printf("PSK2: %s\n", config.Psk2)
 	return config, nil
 }

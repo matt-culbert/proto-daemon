@@ -24,7 +24,7 @@ func GetDataRequest(baseUrl string, maxRetries int, cookies ...*http.Cookie) (*h
 
 	// Parse the base URL
 	reqURL, err := url.Parse(baseUrl)
-	//fmt.Printf("Parsing req URL %s\n", reqURL)
+	fmt.Printf("Parsing HTTP req URL %s\n", reqURL)
 	if err != nil {
 		//fmt.Println(err)
 		return nil, fmt.Errorf("invalid URL: %w", err)

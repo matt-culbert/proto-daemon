@@ -15,7 +15,11 @@ var configData []byte // Embedded config data
 
 // Config struct to hold configuration
 type Config struct {
-	Listener string `json:"listener"`
+	Method   string `json:"method"`
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	GetPath  string `json:"get_path"`
+	PostPath string `json:"post_path"`
 	Id       string `json:"id"`
 	Sleep    string `json:"sleep"`
 	Psk1     string `json:"psk1"`

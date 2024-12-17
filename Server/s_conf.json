@@ -1,27 +1,49 @@
 {
-  "listeners": [
+  "keys": [
     {
-      "name": "DefGET",
+      "psk1": "1234",
+      "psk2": "4321"
+    }
+  ],
+  "host_info": [
+    {
+      "host": "localhost",
+      "method": "http",
+      "port": "5000"
+    }
+  ],
+  "default-GET": [
+    {
+      "name": "default-GET",
       "abs_path":"/",
       "path":  "/",
       "enabled": "true",
       "method": "GET",
-      "auth": "true",
-      "comp": "false"},
+      "auth": "false",
+      "comp": "false"}
+    ],
+  "default-POST":[
     {
-      "name": "DefPOST",
+      "name": "default-POST",
       "abs_path":"/",
       "path":  "/",
       "enabled": "true",
-      "method": "POST"}
+      "method": "POST",
+      "auth": "false",
+      "comp": "false"}
   ],
-  "custom_listeners": [
+  "custom_listener": [
     {
-      "name": "my_route",
-      "abs_path":"/example",
-      "path":  "/example",
-      "enabled": "true",
-      "method": "GET"
+      "my_route": [
+        {
+          "name": "example_route",
+          "abs_path": "/example",
+          "path": "/example",
+          "enabled": "true",
+          "method": "GET"
+        }
+      ]
     }
   ]
 }
+

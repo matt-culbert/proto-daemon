@@ -1,7 +1,1 @@
-{
-    "listener": "127.0.0.1:5000",
-    "sleep":"50",
-    "id":"1234",
-    "psk1":"1234",
-    "psk2":"4321"
-}
+{"psk1": "1234", "psk2": "4321", "host": "localhost", "method": "http", "port": "5000", "get_path": "/", "post_path": "/"}

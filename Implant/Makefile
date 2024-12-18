@@ -7,9 +7,9 @@ build:
 	@echo "Building default options with random ID: $(RAND_NUM)"
 	@echo "Building with compression: $(BUILD_TAG)"
 	@if "$(BUILD_TAG)"=="withComp" ( \
-		go build -ldflags "-X main.CompUUID=$(RAND_NUM)" -tags "withComp withHttp" ./daemon \
+		go build  -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withComp withHttp" ./daemon \
 	) else ( \
-		go build -ldflags "-X main.CompUUID=$(RAND_NUM)" -tags "withHttp" ./daemon \
+		go build  -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withHttp" ./daemon \
 	)
 
 

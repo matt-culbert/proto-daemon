@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"0xo0xo0xo0xo0/z/rogue"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,9 +10,43 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
+
+// SecureStruct holds the mutex, seed, and Counter.
+// The mutex allows it to be locked, the seed is set at launch time, and the Counter is incremented every call
+// The Counter can be changed to an algorithmically complicated increment
+// The seed can be changed to a random string that is changed every launch cycle
+type SecureStruct struct {
+	mu      sync.Mutex
+	seed    string
+	Counter int
+}
+
+// NewSecureFunction creates a new SecureStruct with the given seed.
+func NewSecureFunction(seed string) *SecureStruct {
+	return &SecureStruct{
+		seed:    seed,
+		Counter: 0,
+	}
+}
+
+// Private method to generate the key for the current Counter.
+func (s *SecureStruct) generateKey() string {
+	// Derive a key using the seed and Counter
+	data := fmt.Sprintf("%s:%d", s.seed, s.Counter)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])
+}
+
+// ProtectedCaller allows an external caller to generate the key for a given Counter.
+func ProtectedCaller(seed string, counter int) string {
+	data := fmt.Sprintf("%s:%d", seed, counter)
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])
+}
 
 // DecodeIPv6ToString takes a string formatted like an IPv6 address (e.g., ["7465:7374::"])
 // and decodes it back into its original string representation.
@@ -48,7 +83,17 @@ func DecodeIPv6ToString(encoded string) (string, error) {
 
 // VerifyMessageWithHMAC takes in a message, a received HMAC, and a secret key
 // and returns true if the HMAC is valid for the message and secret key.
-func VerifyMessageWithHMAC(message, receivedHMAC string, secretKey []byte) bool {
+func (s *SecureStruct) VerifyMessageWithHMAC(message, receivedHMAC, providedKey string, secretKey []byte) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Generate the expected key for this call
+	expectedKey := s.generateKey()
+	if providedKey != expectedKey {
+		// The provided key is incorrect so don't proceed
+		rogue.FuncDF7858354()
+	}
+
 	// Create a new HMAC object using SHA-256
 	h := hmac.New(sha256.New, secretKey)
 	h.Write([]byte(message))
@@ -67,7 +112,17 @@ func VerifyMessageWithHMAC(message, receivedHMAC string, secretKey []byte) bool 
 
 // GenerateAuthToken takes in a URI and PSK
 // and returns an auth token to use when requesting commands
-func GenerateAuthToken(uri, psk string) (string, string) {
+// Update to add secret key requirement before producing the auth token
+func (s *SecureStruct) GenerateAuthToken(uri, psk, providedKey string) (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Generate the expected key for this call
+	expectedKey := s.generateKey()
+	if providedKey != expectedKey {
+		// The provided key is incorrect so don't proceed
+		rogue.FuncDF7858354()
+	}
 	// Generate a timestamp (current Unix time as a string)
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
 

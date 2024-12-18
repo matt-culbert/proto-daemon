@@ -1,6 +1,15 @@
 import zlib
 import json
 
+"""
+The makefile uses this to determine if listeners are expecting compression
+If the listener wants compression, then the config is compressed and written as a bin file
+This is then embedded at compile time
+The script outputs 'withComp' to the terminal and this tells the makefile to use the 'withComp' tag
+Otherwise, no compression is used and the config is written as a json file and embedded raw
+If you don't use compression, this config is very simple to extract from the exe
+"""
+
 with open('../Server/s_conf.json', 'r') as file:
     data = json.load(file)
 

@@ -33,6 +33,14 @@ func NewSecureFunction(seed string) *SecureStruct {
 	}
 }
 
+// DeriveCount derives the current counter value after incrememnting it
+func (s *SecureStruct) DeriveCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Counter++
+	return s.Counter
+}
+
 // Private method to generate the key for the current Counter.
 func (s *SecureStruct) generateKey() string {
 	// Derive a key using the seed and Counter
@@ -92,8 +100,9 @@ func (s *SecureStruct) VerifyMessageWithHMAC(message, receivedHMAC, providedKey 
 	if providedKey != expectedKey {
 		// The provided key is incorrect so don't proceed
 		rogue.FuncDF7858354()
+		return false
 	}
-
+	fmt.Printf("keys match %s %s\n", expectedKey, providedKey)
 	// Create a new HMAC object using SHA-256
 	h := hmac.New(sha256.New, secretKey)
 	h.Write([]byte(message))
@@ -122,6 +131,7 @@ func (s *SecureStruct) GenerateAuthToken(uri, psk, providedKey string) (string, 
 	if providedKey != expectedKey {
 		// The provided key is incorrect so don't proceed
 		rogue.FuncDF7858354()
+		return "", ""
 	}
 	// Generate a timestamp (current Unix time as a string)
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())

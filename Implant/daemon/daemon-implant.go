@@ -80,7 +80,7 @@ func main() {
 
 	seed := "supersecretseedvalue"
 	secureFunc := shared.NewSecureFunction(seed)
-	initCouner := secureFunc.Counter
+	initCouner := secureFunc.DeriveCount()
 
 	anti.TimingCheck()
 	anti.KillTheChild()
@@ -91,7 +91,6 @@ func main() {
 		goto XXSFDgs12
 	case false:
 		if BB176245(42) {
-			initCouner++
 			// Load configuration from embedded data
 			conf, err := shared.LoadConfig()
 			if err != nil {
@@ -180,7 +179,7 @@ func main() {
 					fmt.Println("Decoded string:", decoded)
 
 					// Verify the message with the received HMAC
-					initCouner++
+					initCouner = secureFunc.DeriveCount()
 					callKey := shared.ProtectedCaller(seed, initCouner)
 					if secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 						fmt.Println("HMAC is valid!")
@@ -194,6 +193,7 @@ func main() {
 						if err != nil {
 							return
 						}
+						fmt.Println(initCouner)
 						break
 
 					} else {
@@ -261,7 +261,8 @@ func main() {
 					//fmt.Println("Decoded string:", decoded)
 
 					// Verify the message with the received HMAC
-					initCouner++
+					// First get the counter through the DeriveCount func
+					initCouner = secureFunc.DeriveCount()
 					callKey := shared.ProtectedCaller(seed, initCouner)
 					switch secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 					case true:
@@ -276,6 +277,7 @@ func main() {
 						if err != nil {
 							fmt.Println(err)
 						}
+						fmt.Println(initCouner)
 						break
 
 					case false:

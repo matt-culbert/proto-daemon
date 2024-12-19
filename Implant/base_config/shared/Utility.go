@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"0xo0xo0xo0xo0/z/rogue"
+	"NULL/0x27894365/base_config/rogue"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"

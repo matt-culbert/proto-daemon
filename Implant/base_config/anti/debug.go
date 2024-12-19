@@ -1,6 +1,6 @@
 //go:build windows
 
-package anti
+package q
 
 import (
 	"fmt"

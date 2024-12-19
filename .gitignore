@@ -12,4 +12,6 @@
 /Server/__pycache__
 *.pyc
 Server/s_conf.json
-Implant/shared/config.bin
+Implant/config/shared/config.bin
+*.bin
+/Implant/preprocessor

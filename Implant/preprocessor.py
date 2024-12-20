@@ -1,8 +1,11 @@
+import json
 import os
 import re
 import random
 import string
 import shutil
+import zlib
+
 
 def generate_random_name(length=8):
     """Generates a random name of the given length using letters only."""
@@ -59,7 +62,7 @@ def process_go_file(input_path, output_path, old_import_path, new_import_path, g
     with open(output_path, 'w') as file:
         file.write(updated_content)
 
-    print(f"Processed {input_path} -> {output_path}: {len(function_names)} functions renamed.")
+    #print(f"Processed {input_path} -> {output_path}: {len(function_names)} functions renamed.")
 
 
 def process_directory(input_directory, output_directory, old_import_path, new_import_path):
@@ -96,10 +99,10 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Randomize Go function names and update import paths.")
-    parser.add_argument('input_directory', help="Path to the directory containing Go files.")
-    parser.add_argument('output_directory', help="Path to the directory where processed files will be saved.")
-    parser.add_argument('old_import_path', help="The old import path to be replaced.")
-    parser.add_argument('new_import_path', help="The new import path to use.")
+    parser.add_argument('input_directory', nargs='?', default='./base_config', help="Path to the directory containing Go files.")
+    parser.add_argument('output_directory', nargs='?', default='./preprocessor', help="Path to the directory where processed files will be saved.")
+    parser.add_argument('old_import_path', nargs='?', default='NULL/0x27894365/base_config/', help="The old import path to be replaced.")
+    parser.add_argument('new_import_path', nargs='?', default='NULL/0x27894365/preprocessor/', help="The new import path to use.")
 
     args = parser.parse_args()
 
@@ -107,6 +110,60 @@ def main():
         shutil.rmtree(args.output_directory)  # Clear the output directory if it exists
 
     process_directory(args.input_directory, args.output_directory, args.old_import_path, args.new_import_path)
+
+    """
+    The makefile uses this to determine if listeners are expecting compression
+    If the listener wants compression, then the config is compressed and written as a bin file
+    This is then embedded at compile time
+    The script outputs 'withComp' to the terminal and this tells the makefile to use the 'withComp' tag
+    Otherwise, no compression is used and the config is written as a json file and embedded raw
+    If you don't use compression, this config is very simple to extract from the exe
+    """
+
+    with open('../Server/s_conf.json', 'r') as file:
+        data = json.load(file)
+
+    psk1 = data["keys"][0]["psk1"]
+    psk2 = data["keys"][0]["psk2"]
+    host = data["host_info"][0]["host"]
+    method = data["host_info"][0]["method"]
+    port = data["host_info"][0]["port"]
+    get_path = data["default-GET"][0]["path"]
+    post_path = data["default-POST"][0]["path"]
+    is_compression = data["default-GET"][0]["comp"].lower() == "true"
+
+    config = {
+        "psk1": psk1,
+        "psk2": psk2,
+        "host": host,
+        "method": method,
+        "port": port,
+        "get_path": get_path,
+        "post_path": post_path
+    }
+
+    if is_compression:
+        # Convert JSON to string and encode to bytes
+        json_data = json.dumps(config).encode('utf-8')
+
+        # Compress the data using zlib
+        compressed_data = zlib.compress(json_data)
+
+        # Write the binary compressed data to a file
+        with open('preprocessor/shared/config.bin', 'wb') as f:
+            f.write(compressed_data)
+
+        print('y')
+
+    else:
+        json_data = json.dumps(config)
+
+        # Write the JSON data to file
+        with open('preprocessor/shared/config.json', 'w') as f:
+            f.write(json_data)
+
+        print("n")
+
 
 
 if __name__ == "__main__":

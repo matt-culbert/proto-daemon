@@ -15,3 +15,5 @@ Server/s_conf.json
 Implant/config/shared/config.bin
 *.bin
 /Implant/preprocessor
+Server/s_conf.json
+*.json

@@ -36,7 +36,7 @@ def authenticate_user(uname_retr: str, pw_retr: str) -> str:
 
 
 def unified_send(rtype, operator_name, session_token, imp_id = None, command = None,
-                 comp_proto = None, is_garbled = None, bp_name = None):
+                 compile_proto = None, is_garbled = None, bp_name = None):
     """
     Unified send function to send and receive info from the C2
     :param rtype: PUB, RTR, BLD, RFR
@@ -44,7 +44,7 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
     :param session_token: The operators session token
     :param imp_id: optional: The implant ID to send and retrieve info to/from
     :param command: optional: If sending a command then the command
-    :param comp_proto: optional: If compiling an implant, the protocol to use
+    :param compile_proto: optional: If compiling an implant, the protocol to use
     :param is_garbled: optional: If compiling, whether or not to use garble to compile
     :param bp_name: The name of the Blueprint
     :return: server response
@@ -67,7 +67,7 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
         case "RTR":
             publish_request = f"RTR {operator_name} {session_token} {imp_id}"
         case "BLD":
-            publish_request = f"BLD {operator_name} {session_token} {comp_proto} {is_garbled}"
+            publish_request = f"BLD {operator_name} {session_token} {compile_proto}"
         case "RFR":
             publish_request = f"RFR {operator_name} {session_token} {bp_name}"
         case "EMT":
@@ -112,12 +112,8 @@ if __name__ == "__main__":
             case "3":
                 build_choice = input("HTTP or DNS > ")
                 if build_choice.lower() != "http" and build_choice.lower() != "dns":
-                    build_choice = input("Need HTTP/DNS > ")
-
-                garbled = input("Compile with Garbler (y/n) > ").strip().lower()
-                if garbled != "y" and garbled != "n":
-                    garbled = input("Need y/n > ")
-                unified_send("BLD", uname, session_token, comp_proto="http", is_garbled=garbled)
+                    build_choice = input("!! Need HTTP/DNS > ")
+                unified_send("BLD", uname, session_token, compile_proto=build_choice.lower())
             case "4":
                 bp_name = input("Enter the name of the new Blueprint > ")
                 print("Refreshing routes")

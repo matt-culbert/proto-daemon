@@ -20,7 +20,7 @@
       "enabled": "true",
       "method": "GET",
       "auth": "false",
-      "comp": "false"}
+      "comp": "true"}
     ],
   "default-POST":[
     {

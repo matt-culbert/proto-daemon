@@ -160,7 +160,7 @@ def build_implant(protocol):
         case "http":
             try:
                 result = subprocess.run(
-                    ["make build EN_DNS=false"],
+                    ["make http"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,
@@ -180,7 +180,7 @@ def build_implant(protocol):
         case "dns":
             try:
                 result = subprocess.run(
-                    ["make build EN_DNS=true"],
+                    ["make dns"],
                     cwd='../Implant',
                     check=True,
                     capture_output=True,

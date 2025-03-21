@@ -50,16 +50,11 @@ make withLua METHOD=withHttp # Example to compile for HTTP comms
 If you're curious about what's supported or you want to compile the implant manually, this covers it.
 There are tags and ldflags that setup things like the callback URLs, implant ID, and enable supported features.
 #### Compile flag options
+Most options are read from the implant config file. The one requiring input is the UUID to compile with.
 ```bash
 # Implant UUID
 # Expects a random but unique 4 digit integer
 -X main.CompUUID 
-# POST URI to use 
-# Default POST option is `/` or use other listeners you have made
--X main.PostURI 
-# GET URI to use
-# Default GET option is `/` or use other listeners you have made
--X main.GetURI
 ```
 #### Compile tag options
 ```bash
@@ -80,12 +75,9 @@ go build -ldflags <ldflags> -tags <features> ./Implant/daemon
 ```
 #### Example
 ```bash
-go build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags "withComp withHttp" ./Implant/daemon
+go build -trimpath -ldflags "-X main.CompUUID=1234 -s -w" -tags "withComp withDns" ./preprocessor/daemon
 ```
-#### Or using Garble
-```bash
-garble build -ldflags "-X main.CompUUID=5678 -X main.PostURI=/ -X main.GetURI=/" -tags "withComp withHttp" ./Implant/daemon
-```
+
 ### User customization
 Theres several profile options and listener options that can be configured.
 #### Pre-shared encryption keys

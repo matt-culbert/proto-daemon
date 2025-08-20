@@ -1,4 +1,4 @@
-name: Generate an OpenSSL cert
+name: Run a go vuln check 
 
 on:
   push:
@@ -13,7 +13,4 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Download govulncheck 
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-        
-      - name: Run a check 
-        run: govulncheck ./..
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./..

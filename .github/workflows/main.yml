@@ -3,14 +3,12 @@ name: Run a go vuln check
 on:
   push:
     branches:
-      - main # Set a branch to deploy when pushed
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    name: Run govulncheck
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Download govulncheck 
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./..
+      - id: govulncheck
+        uses: golang/govulncheck-action@v1

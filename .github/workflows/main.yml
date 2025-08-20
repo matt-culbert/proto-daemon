@@ -1,0 +1,19 @@
+name: Generate an OpenSSL cert
+
+on:
+  push:
+    branches:
+      - main # Set a branch to deploy when pushed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download govulncheck 
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        
+      - name: Run a check 
+        run: govulncheck ./..

@@ -7,9 +7,9 @@ http:
 	@echo "Building default options with random ID: $(RAND_NUM)"
 	@echo "Building with compression? $(COMPRESSION)"
 	@if "$(COMPRESSION)"=="y" ( \
-		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withComp withHttp" ./preprocessor/daemon  \
+		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withComp withHttp" ./base_config/daemon  \
 	) else ( \
-		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withHttp" ./preprocessor/daemon \
+		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withHttp" ./base_config/daemon \
 	)
 
 # DNS build rule
@@ -17,9 +17,9 @@ dns:
 	@echo "Building for DNS with random ID: $(RAND_NUM)"
 	@echo "Building with compression? $(COMPRESSION)"
 	@if "$(COMPRESSION)"=="y" ( \
-		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withComp withDns" ./preprocessor/daemon  \
+		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withComp withDns" ./base_config/daemon  \
 	) else ( \
-		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withDns" ./preprocessor/daemon \
+		go build -trimpath -ldflags "-X main.CompUUID=$(RAND_NUM) -s -w" -tags "withDns" ./base_config/daemon \
 	)
 
 # Clean rule to remove the binary

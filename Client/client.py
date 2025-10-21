@@ -45,7 +45,7 @@ def unified_send(rtype, operator_name, session_token, imp_id = None, command = N
     :param imp_id: optional: The implant ID to send and retrieve info to/from
     :param command: optional: If sending a command then the command
     :param compile_proto: optional: If compiling an implant, the protocol to use
-    :param is_garbled: optional: If compiling, whether or not to use garble to compile
+    :param is_garbled: optional: If compiling, whether to use garble to compile
     :param bp_name: The name of the Blueprint
     :return: server response
     """

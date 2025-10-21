@@ -41,11 +41,21 @@ func GetGroupsSID() (groups string) {
 	return groups
 }
 
-func ReadFile(filePath string) (fileOut string) {
-	content, err := os.ReadFile(filePath)
+func ReadFile(FilePath string) (FileOut string) {
+	content, err := os.ReadFile(FilePath)
 	if err != nil {
-		fileOut = "error reading file %e" + err.Error()
+		FileOut = "error reading file %e" + err.Error()
 	}
-	fileOut = string(content)
-	return fileOut
+	FileOut = string(content)
+	return FileOut
+}
+
+func GetDir(Path string) (contents string) {
+	files, _ := os.ReadDir(Path)
+
+	for _, file := range files {
+		contents += file.Name()
+		contents += ", "
+	}
+	return contents
 }

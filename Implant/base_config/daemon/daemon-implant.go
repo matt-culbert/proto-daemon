@@ -89,7 +89,7 @@ func runCommands(in string) (out string) {
 		procOut = shared.GetCurrentDir()
 	case "whoami":
 		procOut = shared.GetCurrentUser()
-	case "groupSID":
+	case "groupsid":
 		procOut = shared.GetGroupsSID()
 	case "dir":
 		procOut = shared.GetDir(procIn)

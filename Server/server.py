@@ -413,7 +413,7 @@ def handle_client(client_socket, client_id):
                 if token in operator_session_tokens:
                     results = get_results_by_implant(uname, implant_id)
                     if results:
-                        results = results + ":green"
+                        results = results + " :green"
                         client_socket.send(results.encode())
                         logger.info(f"sent controller results {results}")
                     else:

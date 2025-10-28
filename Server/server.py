@@ -413,7 +413,7 @@ def handle_client(client_socket, client_id):
                 if token in operator_session_tokens:
                     results = get_results_by_implant(uname, implant_id)
                     if results:
-                        results = results + " :green"
+                        results = f"'{results}'" + ":green"
                         client_socket.send(results.encode())
                         logger.info(f"sent controller results {results}")
                     else:
@@ -673,6 +673,7 @@ def restrict_routes():
                 logger.info("route auth check success")
                 pass
             else:
+                logger.info("route auth check failed")
                 abort(404)
         elif auth and comp:
             logger.info(f"auth required for route: {request.path} {request.method}")
@@ -699,6 +700,7 @@ def restrict_routes():
                 logger.info("verified the auth token")
                 pass
             else:
+                logger.info("route auth check failed")
                 abort(404)
 
 

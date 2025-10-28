@@ -150,7 +150,7 @@ def main():
         compressed_data = zlib.compress(json_data)
 
         # Write the binary compressed data to a file
-        with open('preprocessor/shared/config.bin', 'wb') as f:
+        with open('base_config/shared/config.bin', 'wb') as f:
             f.write(compressed_data)
 
         print('y')
@@ -159,7 +159,7 @@ def main():
         json_data = json.dumps(config)
 
         # Write the JSON data to file
-        with open('preprocessor/shared/config.json', 'w') as f:
+        with open('base_config/shared/config.json', 'w') as f:
             f.write(json_data)
 
         print("n")
